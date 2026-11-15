@@ -1,12 +1,12 @@
-; Inno Setup wrapper for the Engine on Windows: carries the Engine's payload and a Python, asks what only a person knows, and runs
-; installers/windows/engine_install.py. Built by installers/windows/build_setup.py (role engine):
+; Inno Setup wrapper for the Engine on Windows: carries the Engine's payload, a Python and Falcon's own PostgreSQL, asks what only a person
+; knows, and runs installers/windows/engine_install.py. Built by installers/windows/build_setup.py (role engine):
 ;
-;     iscc /DPayload=out\falcon-engine /DPython=out\python /DVersion=0.0.1 installers\windows\falcon-engine.iss
+;     iscc /DPayload=out\falcon-engine /DPython=out\python /DPgSql=out\pgsql /DStore=https://<store> /DVersion=0.0.1 installers\windows\falcon-engine.iss
 ;
-; PostgreSQL is installed first (postgresql.org's installer). Its superuser password is asked once, to make the Engine's own role with a
-; password made here; it goes to the installer in a file in Setup's temporary folder, never on a command line, and is not kept.
-; Silent install: falcon-engine-setup.exe /VERYSILENT /ANSWERS=answers.json   (the same keys as below: names, hostname, port,
-; pg_password, download_model, or database_url for a role and database that exist).
+; No PostgreSQL is installed first and none is asked for: the Engine has its own, private to Falcon (docs/SEATS-AND-SETUP.md section 4). The
+; person signs in to the company's account in the browser while it installs (internet required). No Admin is made: the first IT Admin runs
+; the Admin setup on their own PC. Silent install: falcon-engine-setup.exe /VERYSILENT /ANSWERS=answers.json (names, port, company_name,
+; download_model; or database_url for an IT department's own server).
 
 #ifndef Payload
   #define Payload "out\falcon-engine"
@@ -16,6 +16,12 @@
 #endif
 #ifndef Version
   #define Version "0.0.1"
+#endif
+#ifndef PgSql
+  #error Falcon's PostgreSQL is needed: build with /DPgSql=<trimmed pgsql folder> (build_setup.py does)
+#endif
+#ifndef Store
+  #error the Engine setup registers with the store: build it with /DStore=https://...
 #endif
 
 [Setup]
@@ -33,6 +39,8 @@ SolidCompression=yes
 [Files]
 Source: "{#Payload}\*"; DestDir: "{tmp}\payload"; Flags: recursesubdirs createallsubdirs ignoreversion
 Source: "{#Python}\*"; DestDir: "{app}\python"; Flags: recursesubdirs createallsubdirs ignoreversion
+; Falcon's own PostgreSQL, kept with the program and never put on PATH
+Source: "{#PgSql}\*"; DestDir: "{app}\pgsql"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [UninstallRun]
 ; with the Python Setup installed, from the program's folder: nothing it removes is in use (see falcon.iss)
@@ -48,7 +56,6 @@ Type: dirifempty; Name: "{app}"
 [Code]
 var
   NamesPage: TInputQueryWizardPage;
-  DbPage: TInputQueryWizardPage;
   ModelPage: TInputOptionWizardPage;
   InstallFailed: Boolean;
 
@@ -72,23 +79,15 @@ end;
 procedure InitializeWizard;
 begin
   NamesPage := CreateInputQueryPage(wpSelectDir, 'This Engine on the network',
-    'How the PCs will reach this machine, and who the first IT Admin is',
+    'How the PCs will reach this machine, and whose it is',
     'Every name or address the PCs will use to reach this Engine, separated by commas (the first is the one every PC is given). ' +
     'Use a name such as falcon.internal: then moving to another network changes one line on each PC, never the certificate.');
   NamesPage.Add('Names and addresses:', False);
-  NamesPage.Add('The first IT Admin''s PC name:', False);
   NamesPage.Add('Port:', False);
+  NamesPage.Add('Company name (only if your Falcon account has none yet):', False);
   NamesPage.Values[0] := 'falcon.internal,' + GetComputerNameString;
-  NamesPage.Values[1] := 'IT-01';
-  NamesPage.Values[2] := '7400';
-  DbPage := CreateInputQueryPage(NamesPage.ID, 'PostgreSQL',
-    'The database the Engine keeps everything in',
-    'PostgreSQL must already be installed on this machine. Its superuser password is used once, to make the Engine''s own login with a ' +
-    'password of its own; it is not kept.');
-  DbPage.Add('Superuser name:', False);
-  DbPage.Add('Superuser password:', True);
-  DbPage.Values[0] := 'postgres';
-  ModelPage := CreateInputOptionPage(DbPage.ID, 'The local language model',
+  NamesPage.Values[1] := '7400';
+  ModelPage := CreateInputOptionPage(NamesPage.ID, 'The local language model',
     'Tasks are read by a model that runs on this machine: nothing leaves it',
     'It is about 1.8 GB and is downloaded once. Without it, Tasks still work, with less help in reading what is asked.', False, False);
   ModelPage.Add('Download the model now (needs the internet)');
@@ -105,9 +104,8 @@ begin
     FileCopy(Given, Path, False);
     exit;
   end;
-  SaveStringToFile(Path, '{"names": ' + JsonStr(Trim(NamesPage.Values[0])) + ', "hostname": ' + JsonStr(Trim(NamesPage.Values[1])) +
-    ', "port": ' + JsonStr(Trim(NamesPage.Values[2])) + ', "pg_user": ' + JsonStr(Trim(DbPage.Values[0])) +
-    ', "pg_password": ' + JsonStr(DbPage.Values[1]) + ', "download_model": ' + IntToStr(Ord(ModelPage.Values[0])) + '}', False);
+  SaveStringToFile(Path, '{"names": ' + JsonStr(Trim(NamesPage.Values[0])) + ', "port": ' + JsonStr(Trim(NamesPage.Values[1])) +
+    ', "company_name": ' + JsonStr(Trim(NamesPage.Values[2])) + ', "download_model": ' + IntToStr(Ord(ModelPage.Values[0])) + '}', False);
 end;
 
 // The installer, its account kept in the program folder's install-log.txt; a failure shows its end (exit code 10 when silent).
@@ -122,8 +120,8 @@ begin
   Answers := ExpandConstant('{tmp}\answers.json');
   WriteAnswers(Answers);
   Args := '-m installers.windows.engine_install --source "' + ExpandConstant('{tmp}\payload') + '" --target "' + ExpandConstant('{app}') +
-          '" --python "' + Py + '" --answers "' + Answers + '"';
-  WizardForm.StatusLabel.Caption := 'Installing the Falcon Engine (this takes a few minutes)...';
+          '" --python "' + Py + '" --store "{#Store}" --answers "' + Answers + '"';
+  WizardForm.StatusLabel.Caption := 'Installing the Falcon Engine (a few minutes). Sign in to your Falcon account in the browser when it opens.';
   if not Exec(ExpandConstant('{cmd}'), '/C ""' + Py + '" ' + Args + ' > "' + Log + '" 2>&1"', ExpandConstant('{tmp}\payload'), SW_HIDE,
               ewWaitUntilTerminated, Code) or (Code <> 0) then
   begin

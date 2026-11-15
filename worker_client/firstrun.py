@@ -1,9 +1,9 @@
-"""The Worker's first run: not set up yet, so the person is asked for the Engine's address and a licence code.
+"""The Worker's first run, when nobody has told this machine where its Engine is.
 
-The asking is a modal in the Falcon program's own window. The program runs as the person and may not write the Worker's settings,
-and only talks to the service over `localapp.py`, so until this machine has its id the service answers there through `FirstRun`:
-the view says `setup`, and `app_setup` hands the answer to `enroll()`, the one way a machine joins. With no licence code it joins
-as it always has, with a code on its screen for an IT Admin to type. `ask_in_tui` is the same thing for `--ui`.
+Since 15 Nov 2026 (docs/SEATS-AND-SETUP.md) a machine is told only by the Worker setup, run with the store-signed company file beside it:
+an address and a certificate typed or picked here would be a way in that nothing checks. So the Falcon program's setup modal is answered
+with what to do instead (`join` says it), and nothing joins from here. `FirstRun` is what the service is meanwhile: it answers the program,
+and does nothing else. `ask_in_tui` says the same for `--ui`.
 """
 
 from __future__ import annotations
@@ -13,26 +13,20 @@ import contextlib
 import logging
 from typing import Any
 
-from common.firstrun import (
-    DEFAULT_PORT,
-    UNKNOWN_HOST,
-    keep_certificate,
-    parse_address,
-    plain_reason,
-)
+from common.firstrun import DEFAULT_PORT, UNKNOWN_HOST
 from worker_client.config import WorkerConfig
-from worker_client.enroll import enroll
 from worker_client.localapp import LocalApp
 
 log = logging.getLogger(__name__)
 
 PROGRAM_AGAIN_SECONDS = 30.0
+SET_UP_BY_THE_SETUP = "This machine is set up by the Worker setup, run with your company's file beside it (one zip, from the Machines page of your IT Admin's console). Ask your IT Admin for it."
 
 
 def needs_setup(cfg: WorkerConfig) -> bool:
     """Nobody has told this machine where its Engine is: no settings yet, and still the built-in address. An install that did say
     goes on to ask the Engine by itself, even one pointed at an Engine on this same machine."""
-    told = cfg.path.exists() or cfg.enroll_code or cfg.engine_host not in UNKNOWN_HOST or cfg.engine_port != DEFAULT_PORT
+    told = cfg.path.exists() or cfg.engine_host not in UNKNOWN_HOST or cfg.engine_port != DEFAULT_PORT
     return not cfg.client_id and not told
 
 
@@ -41,19 +35,8 @@ def needs_certificate(cfg: WorkerConfig) -> bool:
 
 
 async def join(cfg: WorkerConfig, address: str, code: str, cert: str, window: Any = None) -> str:
-    """Join with what the person gave. Answers what went wrong, or "" when this machine is set up."""
-    try:
-        host, port = parse_address(address)
-        if cert.strip():
-            cfg.ca_cert = keep_certificate(cert, cfg.path.parent)
-        if needs_certificate(cfg):
-            raise ValueError("Choose the Engine's certificate.")
-        cfg.engine_host, cfg.engine_port, cfg.enroll_code = host, port, code.strip()
-        await enroll(cfg, department_id=cfg.enroll_department, level=cfg.enroll_level, show=lambda m: log.info("%s", m), window=window)
-    except Exception as exc:  # noqa: BLE001 -- everything here ends as words on the modal
-        cfg.enroll_code = ""
-        return plain_reason(exc, address.strip())
-    return ""
+    """What the setup modal is told: nothing joins from here (see the module's text)."""
+    return SET_UP_BY_THE_SETUP
 
 
 class FirstRun:
@@ -115,22 +98,7 @@ class FirstRun:
 
 
 async def ask_in_tui(cfg: WorkerConfig) -> None:
-    """`--ui`: the same questions as dialogs in the middle of the terminal. Cancel leaves it not set up."""
-    from prompt_toolkit.shortcuts import input_dialog, message_dialog
+    """`--ui`: the person is told, in the middle of the terminal, how this machine is set up. Nothing joins from here."""
+    from prompt_toolkit.shortcuts import message_dialog
 
-    error = ""
-    while not cfg.client_id:
-        if error:
-            await message_dialog(title="Set up Falcon", text=error).run_async()
-        address = await input_dialog(title="Set up Falcon", text="The Engine's IP address").run_async()
-        if address is None:
-            return
-        code = await input_dialog(title="Set up Falcon", text="The licence code. Leave it empty to have an IT Admin let it in instead.").run_async()
-        if code is None:
-            return
-        cert = ""
-        if needs_certificate(cfg):
-            cert = await input_dialog(title="Set up Falcon", text="Where the Engine's certificate is on this machine (engine.crt)").run_async()
-            if cert is None:
-                return
-        error = await join(cfg, address, code, cert)
+    await message_dialog(title="Set up Falcon", text=SET_UP_BY_THE_SETUP).run_async()

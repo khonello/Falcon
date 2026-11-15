@@ -77,7 +77,7 @@ when a flow is read in (sent back it was refused); editing a rule keeps its own 
   at a flow's source", one per flow, gathering the files) with two options from `issues.get`: `remove_copies` and `keep_copies`. The Issues
   page draws options from the Engine, so it should need nothing new; check that it reads right.
 
-### Machines: seats and knocking PCs (planned 14 Nov 2026, `docs/SEATS-AND-SETUP.md`; the Engine side comes first)
+### Machines: seats and knocking PCs (Engine built 15 Nov 2026, `docs/SEATS-AND-SETUP.md`; the page is the design session's)
 Replaces Registry's "Asking to join" with its code and the Licences place. On the **Machines** page:
 - **Seat counters**: "Worker seats: 20 bought, 14 in use, 6 free, until 31 Dec 2027", and the same for Admin seats; the end-of-period warning
   and the grace ("ended 3 Nov; 4 days of grace left") when there is one. Seats are bought in the store (a link out; nothing is bought here).
@@ -87,8 +87,43 @@ Replaces Registry's "Asking to join" with its code and the Licences place. On th
 - **Take the seat back** on a seated machine (any Admin; never the last Admin seat: drawn disabled with the reason).
 - **Download Worker setup**: one zip, the company file (from the Engine) and the Worker setup (from the store's public download).
 - No code anywhere: nothing is typed to let a machine in.
-Handlers (to be built, step 2): `seats.summary`, `knocks.list`, `seat.give {knock_id, department_id}`, `seat.take {pc_id}`,
-`company.file`; pushes `knock.waiting`, `seat.given`, `seat.taken`, `seats.changed`.
+- **The Engine's certificate** (somewhere quiet, e.g. Machines > About this Engine): until when, its names, and the next one once made.
+  It renews itself; an Admin rarely needs to act. Renew now and Switch now are TUI power settings (`cert renew`, `cert switch`), not buttons.
+
+Handlers, all built and tested (any Admin; the TUI has each one: `seats`, `knocks`, `seat give`, `seat take`, `seats refresh`, `company-file`, `cert status`):
+- `seats.summary {}` -> `{registered, admin: S, worker: S}`, S = `{bought, in_use, free, valid_until, next_end, in_grace, grace_ends}`. On an
+  Engine not registered with the store `bought` and `free` are null (no limit): say "not counted", not "0 free".
+- `knocks.list {}` -> `{knocks: [{id, hostname, os, mac, hardware_id, signed_in_user, peer, first_seen, last_seen, knocks, status, look_alike: [str]}]}`
+  (waiting ones only). `look_alike` is the reason in words ("another machine is also called FIN-07", "the same hardware as FIN-07").
+- `seat.give {knock_id, department_id}` -> `{pc_id, hostname, department_id, role: "worker"}`. Errors: `invalid` "say which department"
+  (departments exist), `conflict` "no Worker seat is free" (draw Give disabled with that when `free` is 0), `conflict` "already has a seat".
+- `seat.take {pc_id}` -> `{pc_id, role}`. `forbidden` for the last Admin seat (draw it disabled with the reason).
+- `seats.refresh {}` -> `{added}`; `conflict` when not registered.
+- `company.file {}` -> `{file_name: "acme.falcon", envelope, names, port, certificates}`: write `envelope` as JSON to `file_name` and zip it
+  with `falcon-worker-setup.exe` (the store's public download, STORE-CONTRACT.md section 3). `conflict` when not registered.
+- `cert.status {}` -> `{current: C, next: C | null}`, C = `{names, not_after, sha256}`.
+- Pushes to Admins: `knock.waiting {knock_id, hostname}`, `seat.given {pc_id, hostname, role}` (also an Admin coming in with its store
+  claim, role "admin"), `seat.taken {pc_id, hostname, reason}`, `seats.changed`, `machines.changed`. Feed lines: knock.new, seat.given,
+  seat.collected, seat.claimed ("kofi@acme.com took an Admin seat on IT-02"), seat.taken, seats.granted, cert.next_made, cert.switched.
+- Issues: type `seats` (code `SEA-`): a seat period ending (30, 7, 1 days before) and in its 7 days of grace.
+
+**The Worker's own program**: a PC waiting for a seat shows "Waiting for a seat from your Admin" (tray or its window); no code, no button.
+The service already knocks by itself (`worker_client/knock.py`) and is in the moment it is given one.
+
+### GONE from the Engine, 15 Nov 2026 (step 8 of docs/SEATS-AND-SETUP.md): pages still calling them must change
+The old ways in are removed; these handlers now answer `unknown type`. Nothing is faked; each place below needs its new shape:
+- `enroll.list`, `enroll.confirm`, `enroll.refuse`, `enroll.request`, `enroll.wait`, `enroll.cancel`: **MachinesPage.qml** ("Asking to join",
+  with the code typed from the machine's screen) becomes **Waiting for a seat** (`knocks.list`, `seat.give`), above.
+- `licence.import`, `licence.list`, `licence.revoke`: the Licences place goes; the seat counters (`seats.summary`) replace it.
+- **The console's first run (SetupModal.qml, main.qml, bridge.py `setUp`)**: nothing joins from it any more. `firstrun.set_up` now answers
+  every attempt with one sentence, "This console is set up by the Admin setup (falcon-admin-setup.exe): it signs in to your company's
+  Falcon account and takes a free Admin seat. Run it on this PC." The modal should say that and drop its address, licence code and
+  certificate fields.
+- **The Worker's first run (Program.qml's setup modal)**: the same. `app_setup` answers with "This machine is set up by the Worker setup,
+  run with your company's file beside it (one zip, from the Machines page of your IT Admin's console). Ask your IT Admin for it." The
+  modal should say that, with no fields. A machine set up by its setup never shows it.
+- **Window.qml's join-code message** ("Registering this machine. Code 4 8 2 7 1 9"): never opened any more; it can go.
+- `scripts/preview_data.py`'s `enroll.list` sample: swap for `knocks.list` / `seats.summary` samples.
 
 ### Registry / Add a machine (built 2 Nov 2026)
 - **A machine with the console installed is let in as an Admin.** `enroll.confirm` by an IT Admin now accepts a request that asked to be an

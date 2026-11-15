@@ -1,11 +1,10 @@
 """The Engine's installer for Windows (the user, 14 Nov 2026: deployment is on Windows). Linux keeps its own: installers/engine/install.py.
 
-    python -m installers.windows.engine_install --names falcon.internal --hostname IT-01 --admin-url-file pg.txt [--download-model] [--dry-run]
+    python -m installers.windows.engine_install --names falcon.internal --store https://<store> [--company-name Acme] [--download-model] [--dry-run]
     python -m installers.windows.engine_install --uninstall [--purge-data]
 
-Run as an administrator, from a payload folder (`python -m installers.payload engine <folder>`; `falcon-engine-setup.exe` does all of this).
-PostgreSQL is installed first (the EDB installer from postgresql.org); this needs its superuser's URL once, to make the Engine's own role
-(`--admin-url-file`: a file holding postgresql://postgres:<password>@localhost:5432/postgres, so the password is never on a command line). It:
+Run as an administrator, from a payload folder (`python -m installers.payload engine <folder>`; `falcon-engine-setup.exe` does all of this,
+with Falcon's own PostgreSQL in <target>\\pgsql). It (docs/SEATS-AND-SETUP.md section 4):
 
      1. checks this is Windows, an administrator, and that the payload is intact
      2. stops the Engine's service if an older one is running (an upgrade)
@@ -13,15 +12,17 @@ PostgreSQL is installed first (the EDB installer from postgresql.org); this need
      4. makes its own Python runtime there, from the payload's wheels (no network needed)
      5. makes C:\\ProgramData\\Falcon Engine: settings, master secret, certificate and key, model, update packages, logs -- readable only
         by the system and administrators
-     6. PostgreSQL: a `falcon` role with a password made here, and the `falcon` database
+     6. PostgreSQL: Falcon's own (installers/windows/private_pg.py), never mixed with one the machine has: localhost only, a port of its
+        own, only the Engine's role may log in, its own service (FalconPostgres) and account. --database-url uses a server that exists instead.
      7. writes falcon.env there (every setting, with absolute paths)
-     8. runs `python -m engine setup`: certificate for --names, schema, master secret, the first IT Admin, the firewall rule, the client bundle
-     9. installs and starts the FalconEngine service (starts with Windows, restarts itself) and waits for it to answer
-    10. writes a receipt (install.json) the uninstall reads
+     8. runs `python -m engine setup --no-first-admin`: certificate for --names, schema, master secret, the firewall rule
+     9. registers the Engine with the store (sign in in the browser; internet required): store.json and the company file
+    10. installs and starts the FalconEngine service (starts with Windows after FalconPostgres, restarts itself) and waits for it to answer
+    11. writes a receipt (install.json) the uninstall reads
 
-Every step checks what is there first, so running it again repairs or upgrades: the master secret, the database password and the first
-Admin are never made twice. The uninstall removes the service and the program and keeps the data folder (the master secret!) and the
-database unless --purge-data, which still never drops the database.
+No Admin is made here: the first IT Admin runs the Admin setup on their own PC and signs in to the same account. Every step checks what is
+there first, so running it again repairs or upgrades: the master secret, the database and its password, and the registration are never made
+twice. The uninstall removes the services and the program and keeps the data folder (the master secret, the database) unless --purge-data.
 """
 
 from __future__ import annotations
@@ -43,23 +44,15 @@ from installers import payload as payload_mod
 from installers.common import InstallError, Plan, python_ok, run_cmd, write_text
 from installers.engine import render
 from installers.windows.install import is_admin, lock_to_system_and_admins
+from installers.windows.private_pg import SERVICE as PG_SERVICE
+from installers.windows.private_pg import PrivatePostgres
 
 HERE = Path(__file__).resolve().parent.parent.parent
 SERVICE = "FalconEngine"
 SETUPS_OWN = ("python", "unins000.exe", "unins000.dat", "unins000.msg")
 
 
-def find_psql() -> Path | None:
-    """PostgreSQL's psql.exe: on the PATH, else the newest under Program Files\\PostgreSQL."""
-    found = shutil.which("psql")
-    if found:
-        return Path(found)
-    root = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "PostgreSQL"
-    versions = sorted((p for p in root.glob("*/bin/psql.exe")), key=lambda p: [int(x) if x.isdigit() else 0 for x in p.parent.parent.name.split(".")])
-    return versions[-1] if versions else None
-
-
-def env_text(data: Path, database_url: str, port: int) -> str:
+def env_text(data: Path, database_url: str, port: int, pg_bin: Path | None = None) -> str:
     """Every setting with its absolute path (a service's working folder is C:\\Windows\\System32: nothing may be relative)."""
     return "\n".join([
         "# Falcon Engine settings. Written by the installer; edit with care, then restart the FalconEngine service (services.msc).",
@@ -71,6 +64,7 @@ def env_text(data: Path, database_url: str, port: int) -> str:
         f"FALCON_TLS_KEY={(data / 'engine.key').as_posix()}",
         f"FALCON_SECRET_PATH={(data / 'master.secret').as_posix()}",
         f"FALCON_LLM_MODEL_PATH={(data / 'models' / 'Qwen3-1.7B-Q8_0.gguf').as_posix()}",
+        *([f"FALCON_PG_BIN={pg_bin.as_posix()}"] if pg_bin else []),               # backups use Falcon's own PostgreSQL tools, never another's
         "",
     ])
 
@@ -86,9 +80,11 @@ class EngineInstall:
         self.data = Path(args.data) if args.data else Path(pd) / "Falcon Engine"
         self.service = args.service_name or SERVICE
         self.names = [n.strip() for n in (args.names or "").split(",") if n.strip()]
-        self.first_admin: dict[str, str] = {}
         self.fingerprint = ""
+        self.registered: dict = {}
         self._db_password = ""
+        self.pg = PrivatePostgres(bin=Path(args.pgsql) / "bin" if args.pgsql else self.target / "pgsql" / "bin", pgdata=self.data / "pgdata",
+                                  secrets_dir=self.data, service=args.pg_service or PG_SERVICE, acl=not args.no_acl)
 
     @property
     def app(self) -> Path:
@@ -106,10 +102,6 @@ class EngineInstall:
     def bundle(self) -> Path:
         return self.data / "falcon-client.json"
 
-    @property
-    def first_admin_file(self) -> Path:
-        return self.data / "first-admin.txt"
-
     def _env(self) -> dict[str, str]:
         return {**os.environ, "FALCON_ENV_FILE": str(self.env_file)}
 
@@ -122,11 +114,13 @@ class EngineInstall:
         p.add("Copy the code", self.copy_code, f"engine, protocol, common into {self.app}")
         p.add("The runtime", self.runtime, f"{self.target / 'runtime'} with the payload's libraries", skip="--no-runtime" if a.no_runtime else None)
         p.add("The data folder", self.folders, f"{self.data}: readable by the system and administrators only")
-        p.add("PostgreSQL", self.database, "the falcon role and database, with a password made here",
+        p.add("PostgreSQL", self.database, f"Falcon's own, in {self.pg.pgdata}: localhost only, only the Engine logs in ({self.pg.service})",
               skip="--database-url given" if a.database_url else ("--no-database" if a.no_database else None))
         p.add("Settings", self.settings, str(self.env_file))
-        p.add("Setup", self.setup, "certificate, schema, master secret, first IT Admin, firewall, client bundle (python -m engine setup)",
+        p.add("Setup", self.setup, "certificate, schema, master secret, firewall (python -m engine setup --no-first-admin)",
               skip="--no-setup" if a.no_setup else None)
+        p.add("The store", self.register, "sign in in the browser; this Engine is registered with the company's account (internet required)",
+              skip="--no-store (development only: no seats are counted)" if a.no_store else None)
         p.add("The Engine service", self.install_service, f"{self.service}: starts with Windows, restarts itself", skip="--no-service" if a.no_service else None)
         p.add("Receipt", self.receipt, str(self.target / "install.json"))
         return p
@@ -197,19 +191,14 @@ class EngineInstall:
         return f"{self.data}" + ("" if self.a.no_acl else ", readable by the system and administrators only")
 
     def database(self) -> str:
+        if not (self.pg.bin / "postgres.exe").is_file():
+            raise InstallError(f"Falcon's PostgreSQL is not in {self.pg.bin.parent} (falcon-engine-setup.exe puts it there; --pgsql)")
+        said = [self.pg.init(), self.pg.register(), self.pg.lock(), self.pg.start()]
         if self.env_file.exists() and "FALCON_DATABASE_URL=" in self.env_file.read_text(encoding="utf-8"):
-            return "the settings already name a database: kept (its password is not changed)"
-        admin_url = Path(self.a.admin_url_file).read_text(encoding="utf-8").strip() if self.a.admin_url_file else (self.a.admin_url or "")
-        if not admin_url:
-            raise InstallError("PostgreSQL's superuser is needed once, to make the Engine's role: give --admin-url-file (a file holding "
-                               "postgresql://postgres:<password>@localhost:5432/postgres), or --database-url for a role and database that exist")
-        psql = find_psql()
-        if psql is None:
-            raise InstallError("PostgreSQL is not installed (no psql.exe): install it from postgresql.org, then run this again")
+            return "; ".join([*said, "the settings already name the database: kept (its password is not changed)"])
         self._db_password = secrets.token_urlsafe(24)
-        for sql in render.postgres_role_sql(self._db_password, self.a.db_name, self.a.db_role):
-            run_cmd([str(psql), "-v", "ON_ERROR_STOP=1", "-X", "-q", "-d", admin_url], input_text=sql + "\n")
-        return f"the {self.a.db_role} role and the {self.a.db_name} database are there"
+        said.append(self.pg.make_role(self.a.db_name, self.a.db_role, render.postgres_role_sql(self._db_password, self.a.db_name, self.a.db_role)))
+        return "; ".join(said)
 
     def settings(self) -> str:
         url = self.a.database_url
@@ -217,13 +206,15 @@ class EngineInstall:
             found = [ln for ln in self.env_file.read_text(encoding="utf-8").splitlines() if ln.startswith("FALCON_DATABASE_URL=")]
             url = found[0].split("=", 1)[1] if found else None
         if not url:
-            url = (f"postgresql://{self.a.db_role}:{self._db_password}@localhost:5432/{self.a.db_name}" if self._db_password
-                   else f"postgresql://{self.a.db_role}:CHANGE-ME@localhost:5432/{self.a.db_name}")
-        changed = write_text(self.env_file, env_text(self.data, url, self.a.port))
+            if not self._db_password:
+                raise InstallError("no database: the PostgreSQL step did not run (give --database-url for a server that exists)")
+            url = self.pg.url(self.a.db_name, self.a.db_role, self._db_password)
+        own_pg = None if self.a.database_url else self.pg.bin
+        changed = write_text(self.env_file, env_text(self.data, url, self.a.port, own_pg))
         return ("written " if changed else "kept ") + str(self.env_file)
 
     def setup(self) -> str:
-        argv = [str(self.python), "-m", "engine", "setup", "--hostname", self.a.hostname, "--no-operator-config"]
+        argv = [str(self.python), "-m", "engine", "setup", "--no-first-admin", "--no-operator-config"]
         if self.names:
             argv += ["--names", ",".join(self.names)]
         if self.a.download_model:
@@ -232,21 +223,28 @@ class EngineInstall:
         self.say(out.rstrip())
         if rc != 0:
             raise InstallError("`engine setup` did not finish (see above); fix that and run the installer again")
-        for key in ("client_id", "client_key"):
-            for line in out.splitlines():
-                if line.strip().startswith(key + ":"):
-                    self.first_admin[key] = line.split(":", 1)[1].strip()
         if self.bundle.exists():
             self.fingerprint = json.loads(self.bundle.read_text(encoding="utf-8")).get("ca_sha256", "")
-        if self.first_admin.keys() >= {"client_id", "client_key"}:
-            write_text(self.first_admin_file, "The first IT Admin (printed once by the installer; delete this file after it is safely held)\n"
-                       f"client_id:  {self.first_admin['client_id']}\nclient_key: {self.first_admin['client_key']}\n")
-            return f"set up; the first IT Admin's id and key are in {self.first_admin_file}"
-        return "set up (an Admin already existed: no new key was made)"
+        return "set up (certificate, schema, master secret, firewall)"
+
+    def register(self) -> str:
+        from common.store_keys import STORE_URL
+        from installers.store_register import register
+
+        cert = self.data / "engine.crt"
+        if not cert.exists():
+            raise InstallError(f"no certificate at {cert}: the Setup step makes it")
+        self.registered = register(self.a.store or STORE_URL, self.data, self.names, self.a.port, cert.read_text(encoding="utf-8"),
+                                   company_name=self.a.company_name, company_id=self.a.company_id, say=self.say)
+        if self.registered.get("kept"):
+            return f"kept the registration ({self.registered['engine_id']})"
+        return f"registered as {self.registered['engine_id']}; the company file is {self.data / 'company.falcon'}"
 
     def install_service(self) -> str:
         base = [str(self.python), "-m", "engine", "service"]
         run_cmd(base + ["install", "--name", self.service, "--env", str(self.env_file)], cwd=self.app)
+        if not self.a.database_url:
+            run_cmd(["sc.exe", "config", self.service, "depend=", self.pg.service], check=False)    # starts after its database
         _rc, out = run_cmd(base + ["start", "--name", self.service, "--env", str(self.env_file)], cwd=self.app, check=False)
         end = time.monotonic() + 60
         while time.monotonic() < end:
@@ -274,9 +272,9 @@ class EngineInstall:
     def summary(self) -> str:
         lines = ["", "The Engine is installed.", ""]
         if self.fingerprint:
-            lines += ["  Certificate fingerprint (read this out when installing a PC, to be sure it is this Engine):", f"    {self.fingerprint}", ""]
-        lines += [f"  Give every PC's installer:  {self.bundle}",
-                  f"  The first IT Admin's id and key:  {self.first_admin_file}  (keep them, then delete the file)",
+            lines += ["  Certificate fingerprint:", f"    {self.fingerprint}", ""]
+        lines += ["  Now run the Admin setup (falcon-admin-setup.exe) on your IT Admin's PC: it signs in to the same account.",
+                  "  Workers: the console's Machines page gives the Worker setup, with this company's file.",
                   f"  BACK UP, offline:  {self.data / 'master.secret'}  (every machine's key derives from it)", ""]
         return "\n".join(lines)
 
@@ -285,9 +283,9 @@ class EngineInstall:
     def uninstall_plan(self) -> Plan:
         p = Plan("Falcon Engine uninstall (Windows)", say=self.say)
         p.add("Stop and remove the service", self.remove_service, self.service)
+        p.add("Stop and remove its PostgreSQL", self.pg.unregister, self.pg.service)
         p.add("Remove the program", self.remove_program, str(self.target))
-        p.add("Data", self.remove_data, "kept unless --purge-data (the master secret: without it every machine must be registered again); "
-                                         "the database is never dropped")
+        p.add("Data", self.remove_data, "kept unless --purge-data: the master secret (without it every machine must be set up again) and the database")
         return p
 
     def remove_service(self) -> str:
@@ -315,23 +313,26 @@ class EngineInstall:
     def remove_data(self) -> str:
         if self.a.purge_data and self.data.exists():
             shutil.rmtree(self.data)
-            return f"removed {self.data} (including the master secret); the database is kept"
+            return f"removed {self.data} (the master secret and the database with it)"
         return f"kept {self.data}"
 
 
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="installers.windows.engine_install", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--names", default="", help="every name and address the PCs will use to reach this Engine, comma-separated (the first goes in the bundle)")
-    ap.add_argument("--hostname", default="IT-01", help="the first IT Admin's workstation name (not this machine's)")
+    ap.add_argument("--names", default="", help="every name and address the PCs will use to reach this Engine, comma-separated (the first is the one PCs are given)")
+    ap.add_argument("--store", help="the store's address (default: common/store_keys.STORE_URL)")
+    ap.add_argument("--company-name", help="the company's name, when the account signing in has none yet")
+    ap.add_argument("--company-id", help="which company, when the account belongs to several")
+    ap.add_argument("--no-store", action="store_true", help="development only: do not register with the store (no seats are counted)")
+    ap.add_argument("--pgsql", help="Falcon's PostgreSQL programs (default <target>/pgsql)")
+    ap.add_argument("--pg-service", help=f"default {PG_SERVICE}")
     ap.add_argument("--port", type=int, default=7400)
     ap.add_argument("--source", help="the payload folder (default: the one this installer is in)")
     ap.add_argument("--target", help=r"where the program goes (default C:\Program Files\Falcon Engine)")
     ap.add_argument("--data", help=r"where the settings and secrets go (default C:\ProgramData\Falcon Engine)")
     ap.add_argument("--python", help="the Python the runtime is made from (setup.exe passes its own)")
     ap.add_argument("--wheels", help="a folder of wheels, to install with no network")
-    ap.add_argument("--admin-url", help="PostgreSQL's superuser URL (prefer --admin-url-file: a command line is visible to others)")
-    ap.add_argument("--admin-url-file", help="a file holding PostgreSQL's superuser URL, used once to make the Engine's role")
-    ap.add_argument("--database-url", help="use this PostgreSQL URL (a role and database that exist) instead of making them")
+    ap.add_argument("--database-url", help="an IT department's own PostgreSQL (a role and database that exist) instead of Falcon's own")
     ap.add_argument("--no-database", action="store_true", help="do not touch PostgreSQL")
     ap.add_argument("--db-name", default="falcon")
     ap.add_argument("--db-role", default="falcon")
@@ -342,8 +343,8 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--no-acl", action="store_true", help="leave the data folder's permissions as they are (tests)")
     ap.add_argument("--download-model", action="store_true", help="fetch the local language model (~1.8 GB)")
     ap.add_argument("--uninstall", action="store_true")
-    ap.add_argument("--purge-data", action="store_true", help="with --uninstall: also remove the data folder (never the database)")
-    ap.add_argument("--answers", help="a JSON file of these options (what falcon-engine-setup.exe's pages asked; keeps the password off the command line)")
+    ap.add_argument("--purge-data", action="store_true", help="with --uninstall: also remove the data folder, the database with it")
+    ap.add_argument("--answers", help="a JSON file of these options (what falcon-engine-setup.exe's pages asked)")
     ap.add_argument("--dry-run", action="store_true")
     return ap
 
@@ -355,11 +356,6 @@ def main(argv: list[str] | None = None) -> int:
         for key, value in answers.items():
             if value not in (None, "") and hasattr(args, key):
                 setattr(args, key, value)
-        if answers.get("pg_password") and not (args.admin_url or args.admin_url_file or args.database_url):
-            from urllib.parse import quote
-
-            args.admin_url = (f"postgresql://{quote(str(answers.get('pg_user') or 'postgres'), safe='')}:{quote(str(answers['pg_password']), safe='')}"
-                              f"@localhost:{int(answers.get('pg_port') or 5432)}/postgres")       # held in memory only; nothing writes it out
     args.port = int(args.port)
     args.download_model = bool(int(args.download_model)) if isinstance(args.download_model, (str, int)) else bool(args.download_model)
     inst = EngineInstall(args)

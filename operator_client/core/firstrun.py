@@ -1,19 +1,16 @@
-"""The console's first run: not set up yet, so it asks for the Engine's address and an admin licence code, and joins.
+"""The console's first run, when it is not set up.
 
-A console on an Admin's workstation signs through the Worker service there (`signer: pipe`): that service is what joins, and asks
-in the Falcon program, so this console has nothing to ask.
+Since 15 Nov 2026 (docs/SEATS-AND-SETUP.md) a console is set up only by the Admin setup, which signs in to the company's account in the
+store and takes a free Admin seat; its Worker service then signs for it (`signer: pipe`). No licence code exists any more, and an address
+and certificate typed here would be a way in nothing checks: `set_up` answers with what to do instead.
 """
 
 from __future__ import annotations
 
-from common.firstrun import (
-    UNKNOWN_HOST,
-    join_with_licence,
-    keep_certificate,
-    parse_address,
-    plain_reason,
-)
+from common.firstrun import UNKNOWN_HOST
 from operator_client.core.config import LocalConfig
+
+SET_UP_BY_THE_SETUP = "This console is set up by the Admin setup (falcon-admin-setup.exe): it signs in to your company's Falcon account and takes a free Admin seat. Run it on this PC."
 
 
 def needs_setup(cfg: LocalConfig) -> bool:
@@ -29,19 +26,5 @@ def known_address(cfg: LocalConfig) -> str:
 
 
 async def set_up(cfg: LocalConfig, address: str, code: str, cert: str = "") -> str:
-    """Join and remember it. Answers what went wrong, or "" when this console is set up."""
-    try:
-        host, port = parse_address(address)
-        if not code.strip():
-            raise ValueError("Type the licence code.")
-        if cert.strip():
-            cfg.ca_cert = keep_certificate(cert, cfg.path.parent)
-        if needs_certificate(cfg):
-            raise ValueError("Choose the Engine's certificate.")
-        got = await join_with_licence(host, port, tls=cfg.tls, ca_cert=cfg.ca_cert, code=code.strip(), level="admin")
-    except Exception as exc:  # noqa: BLE001 -- everything here ends as words on the modal
-        return plain_reason(exc, address.strip())
-    cfg.engine_host, cfg.engine_port = host, port
-    cfg.client_id, cfg.client_key = got["client_id"], got["client_key"]
-    cfg.save()
-    return ""
+    """What the setup modal is told: nothing joins from here (see the module's text)."""
+    return SET_UP_BY_THE_SETUP

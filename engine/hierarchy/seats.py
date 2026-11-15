@@ -1,13 +1,16 @@
 """Machines knock; Admins give seats (docs/SEATS-AND-SETUP.md, sections 6 and 7; decided with the user 14 Nov 2026).
 
-    knock.hello    {install_token, hostname, os?, mac?, hardware_id?, user?}   before the handshake: "this installed PC is here"
-                   -> {status: waiting} | {status: seated, client_id, client_key, account_id, pc_id} (the key once per seating) | {status: collected}
+    knock.hello    {install_token, hostname, os?, mac?, hardware_id?, user?, admin_claim?}   before the handshake: "this installed PC is here"
+                   -> {status: waiting} | {status: seated, client_id, client_key, account_id, pc_id, role} (the key once per seating) | {status: collected}
+                   With an Admin claim (signed by the store, for this Engine and this PC, unexpired, never used): in at once as an Admin, if an
+                   Admin seat is free (docs/SEATS-AND-SETUP.md section 5).
     knocks.list    {}                    the knocking PCs, with what they say about themselves; look-alikes flagged
     seats.summary  {}                    per kind (admin, worker): bought, in use, free, until when, in grace
     seat.give      {knock_id, department_id?}   any Admin: the knocking PC gets a Worker seat in that department (required when departments
                                          exist; with none, the default "New machines"), if one is free
     seat.take      {pc_id}               any Admin: the machine's seat is taken back (never the last Admin seat); it knocks again
     seats.refresh  {}                    any Admin: ask the store now for grants it has not been given
+    company.file   {}                    any Admin: the store-signed company file (where this Engine is), given with the Worker setup
 
 Knocking grants nothing: a knocking PC reaches nothing but this. There is no code; look-alike PCs are told apart by their name, who is
 signed in, their address and their hardware identity, and two that look alike are flagged. An Engine not registered with the store has no
@@ -37,6 +40,7 @@ ROLES = ("admin", "worker")
 GRACE = timedelta(days=7)
 WARN_DAYS = (30, 7, 1)
 DEFAULT_DEPARTMENT = "New machines"
+ADMIN_DEPARTMENT = "IT"                    # where an Admin's PC that came in with its store claim is put
 NEW_PER_ADDRESS = 20                       # new knocking PCs from one address an hour: more is refused for the hour, and flagged
 NEW_WINDOW = 3600.0
 MAX_WAITING = 5000
@@ -132,6 +136,7 @@ async def knock_hello(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
             raise ProtocolError(ErrorCode.CONFLICT, "too many new machines are knocking from this address; try again in an hour")
         if await db.seats.count_waiting() >= MAX_WAITING:
             raise ProtocolError(ErrorCode.UNAVAILABLE, "too many machines are waiting for a seat")
+    claim = _check_claim(engine, payload.get("admin_claim"), facts) if payload.get("admin_claim") is not None else None
     row = await db.seats.knock(_hash(token), facts, peer)
     ctx.connection.knock_id = row["id"]
     if row["created"]:
@@ -140,15 +145,67 @@ async def knock_hello(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
         await engine.audit.record(None, "knock.new", target_type="knocks", target_id=row["id"],
                                   detail={"hostname": facts["hostname"], "user": facts["user"], "address": peer})
         await engine.push_to_role("admin", "knock.waiting", {"knock_id": row["id"], "hostname": facts["hostname"]})
+    if claim is not None and row["status"] == "waiting":
+        await _claim_seat(engine, row, claim, payload["admin_claim"])
+        row = {**row, "status": "seated", "pc_id": (await db.seats.get_knock(row["id"]))["pc_id"]}
     if row["status"] == "seated":
         if await db.seats.deliver(row["id"]):
             pc = await db.accounts.pc(row["pc_id"])
             assert pc is not None
             await engine.audit.record(None, "seat.collected", target_type="pcs", target_id=row["pc_id"], pc_id=row["pc_id"])
+            seat = await db.seats.active(row["pc_id"])
             return {"status": "seated", "client_id": pc["client_id"], "client_key": engine.client_key(pc["client_id"], pc["key_generation"]),
-                    "account_id": pc["bound_account_id"], "pc_id": row["pc_id"]}
+                    "account_id": pc["bound_account_id"], "pc_id": row["pc_id"], "role": seat["role"] if seat else None}
         return {"status": "collected"}                     # its key was handed over already (an Admin takes the seat back and gives it again)
     return {"status": "waiting"}
+
+
+def _check_claim(engine: Engine, envelope: Any, facts: dict[str, Any]) -> dict[str, Any]:
+    """An Admin claim the store signed for this Engine and this PC, still in date. Its single use is checked when it is spent."""
+    from common import signed
+    from engine.store import parse_time
+
+    try:
+        doc = signed.check(envelope, "admin_claim")
+    except signed.SignatureError as exc:
+        raise ProtocolError(ErrorCode.FORBIDDEN, f"the Admin claim cannot be trusted: {exc}") from exc
+    ident = engine.store.identity
+    if ident is None or doc.get("engine_id") != ident.get("engine_id"):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim is for another Engine")
+    try:
+        expires = parse_time(str(doc.get("expires_at")))
+    except ValueError as exc:
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim has no end") from exc
+    if expires <= datetime.now(timezone.utc):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim has expired: sign in again from the Admin setup")
+    if str(doc.get("hostname") or "").lower() != (facts["hostname"] or "").lower() or (doc.get("hardware_id") and doc.get("hardware_id") != facts["hardware_id"]):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim was made for another machine")
+    if not doc.get("claim_id"):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "the Admin claim has no id")
+    return doc
+
+
+async def _claim_seat(engine: Engine, knock: dict[str, Any], claim: dict[str, Any], envelope: dict[str, Any]) -> None:
+    """The claim is spent and the PC is in as an Admin's workstation, if an Admin seat is free."""
+    db = engine.db
+    if await db.seats.claim_used(str(claim["claim_id"])):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "this Admin claim was used already: sign in again from the Admin setup")
+    free = await _free(engine, "admin")
+    if free is not None and free <= 0 and engine.store.registered:
+        await engine.store.fetch_grants()                                           # bought a moment ago, perhaps: ask the store first
+        free = await _free(engine, "admin")
+    if free is not None and free <= 0:
+        raise ProtocolError(ErrorCode.CONFLICT, "no Admin seat is free: more are bought in the store, or an Admin takes a seat back")
+    if not await db.seats.use_claim(str(claim["claim_id"]), str(claim.get("member_email") or ""), knock["id"], envelope):
+        raise ProtocolError(ErrorCode.FORBIDDEN, "this Admin claim was used already: sign in again from the Admin setup")
+    department_id = await named_department(engine, ADMIN_DEPARTMENT)
+    pc_id = await _seat(engine, knock, "admin", department_id, None)
+    await db.seats.claim_seated(str(claim["claim_id"]), pc_id)
+    await engine.audit.record(None, "seat.claimed", target_type="pcs", target_id=pc_id, pc_id=pc_id,
+                              detail={"hostname": knock["hostname"], "member_email": claim.get("member_email"), "claim_id": claim["claim_id"],
+                                      "knock_id": knock["id"], "role": "admin"})
+    await engine.push_to_role("admin", "seat.given", {"pc_id": pc_id, "hostname": knock["hostname"], "role": "admin"})
+    await engine.push_to_role("admin", "machines.changed", {"pc_id": pc_id})
 
 
 def _alike(knocks: list[dict[str, Any]], seated: list[dict[str, Any]]) -> dict[int, list[str]]:
@@ -196,9 +253,20 @@ async def _department(engine: Engine, asked: int | None) -> int:
         return asked
     if departments:
         raise ProtocolError(ErrorCode.INVALID, "say which department this machine goes into")
-    from engine.hierarchy import licences
+    return await named_department(engine, DEFAULT_DEPARTMENT)
 
-    return await licences.department_for(engine, {"department": DEFAULT_DEPARTMENT}, None, "worker")
+
+async def named_department(engine: Engine, name: str) -> int:
+    """The department of that name, made if it is not there yet (a department is a label in version 1: an Admin moves a machine whenever)."""
+    import asyncpg
+
+    found = next((d for d in await engine.db.accounts.list_departments() if d["name"].lower() == name.lower()), None)
+    if found is not None:
+        return int(found["id"])
+    try:
+        return await engine.db.accounts.create_department(name, None)
+    except asyncpg.UniqueViolationError:                                            # made by another machine at the same moment
+        return int(next(d["id"] for d in await engine.db.accounts.list_departments() if d["name"].lower() == name.lower()))
 
 
 @handler("seat.give")
@@ -225,6 +293,8 @@ async def seat_give(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
 async def _seat(engine: Engine, knock: dict[str, Any], role: str, department_id: int, by_account_id: int | None) -> int:
     """The knocking PC is in: its account and machine (made, or brought back with a new key), its seat, and a nudge on its open connection."""
     db = engine.db
+    if knock["pc_id"] is not None and await _role_of(engine, knock["pc_id"]) != role:
+        knock = {**knock, "pc_id": None}                                            # a Worker PC become an Admin's (or back): a new account
     if knock["pc_id"] is None:
         from engine.hierarchy.accounts import provision
 
@@ -241,6 +311,10 @@ async def _seat(engine: Engine, knock: dict[str, Any], role: str, department_id:
         if getattr(conn, "knock_id", None) == knock["id"]:
             await conn.push("knock.seated", {"pc_id": pc_id})
     return pc_id
+
+
+async def _role_of(engine: Engine, pc_id: int) -> str | None:
+    return await engine.db.seats.last_role(pc_id)
 
 
 async def take_back(engine: Engine, pc_id: int, by_account_id: int | None, reason: str) -> bool:
@@ -290,6 +364,28 @@ async def seats_refresh(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]
     return {"added": added}
 
 
+@handler("company.file")
+async def company_file(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
+    """What the console puts in the Worker setup zip beside the setup (docs/SEATS-AND-SETUP.md section 6): the file as the store signed it."""
+    import json
+
+    from common import signed
+
+    require_role(ctx, "super_user", "admin")
+    store = ctx.engine.store
+    if not store.registered:
+        raise ProtocolError(ErrorCode.CONFLICT, "this Engine is not registered with the store, so it has no company file")
+    path = store.path.parent / "company.falcon"
+    try:
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+        doc = signed.check(envelope, "company")
+    except (OSError, ValueError, signed.SignatureError) as exc:
+        raise ProtocolError(ErrorCode.UNAVAILABLE, f"the company file cannot be read ({exc}): ask the store again with cert renew") from exc
+    slug = "".join(ch for ch in str(doc.get("company_name") or "company").lower() if ch.isalnum()) or "company"
+    return {"file_name": f"{slug}.falcon", "envelope": envelope, "names": doc.get("names"), "port": doc.get("port"),
+            "certificates": len(doc.get("certificates") or [])}
+
+
 # --- at sign-in -------------------------------------------------------------------------------------------------------
 
 async def refused_for_no_seat(engine: Engine, client_id: str, nonce: str, presented: str) -> bool:
@@ -314,25 +410,32 @@ async def watch_periods(engine: Engine, now: datetime | None = None) -> int:
     from engine.store import good_grant
 
     now = now or datetime.now(timezone.utc)
-    for g in await engine.db.seats.grants():
-        if good_grant(engine, g["envelope"]) is None:
+    good = [g for g in await engine.db.seats.grants() if good_grant(engine, g["envelope"]) is not None]
+    # Grants of one kind ending on one day are one warning: a top-up bought mid-year ends with the main grant (docs/STORE-CONTRACT.md).
+    ending: dict[tuple[str, datetime], list[dict[str, Any]]] = {}
+    for g in good:
+        ending.setdefault((g["role"], g["valid_until"]), []).append(g)
+    for (role, end), group in sorted(ending.items(), key=lambda kv: kv[0][1]):
+        n = sum(g["seats"] for g in group)
+        if _carried_on(good, role, end) >= n:                                # renewed already: nothing to warn of
             continue
-        left = g["valid_until"] - now
-        kind = "Admin" if g["role"] == "admin" else "Worker"
-        when = g["valid_until"].strftime("%d %b %Y")
+        kind = "Admin" if role == "admin" else "Worker"
+        when = end.strftime("%d %b %Y")
+        first = min(g["id"] for g in group)
+        detail = {"grant_ids": [g["grant_id"] for g in group], "role": role, "seats": n, "valid_until": end.isoformat()}
+        left = end - now
         for days in WARN_DAYS:
             if timedelta(0) < left <= timedelta(days=days):
                 await issues.raise_issue(engine, type_="seats", severity={30: "low", 7: "medium", 1: "high"}[days],
-                                         title=f"{g['seats']} {kind} seats end on {when}", subject="Renew them in the store",
-                                         source_table=f"seat_grants:{days}d", source_id=g["id"],
-                                         detail={"grant_id": g["grant_id"], "role": g["role"], "seats": g["seats"], "valid_until": g["valid_until"].isoformat()})
+                                         title=f"{n} {kind} seats end on {when}", subject="Renew them in the store",
+                                         source_table=f"seat_grants:{days}d", source_id=first, detail=detail)
                 break
-        if g["valid_until"] <= now < g["valid_until"] + GRACE:
-            ends = (g["valid_until"] + GRACE).strftime("%d %b %Y")
-            await issues.raise_issue(engine, type_="seats", severity="critical", title=f"{g['seats']} {kind} seats ended on {when}",
+        if end <= now < end + GRACE:
+            ends = (end + GRACE).strftime("%d %b %Y")
+            await issues.raise_issue(engine, type_="seats", severity="critical", title=f"{n} {kind} seats ended on {when}",
                                      subject=f"Machines keep working until {ends}; renew in the store before then",
-                                     source_table="seat_grants:grace", source_id=g["id"],
-                                     detail={"grant_id": g["grant_id"], "role": g["role"], "grace_ends": (g["valid_until"] + GRACE).isoformat()})
+                                     source_table="seat_grants:grace", source_id=first,
+                                     detail={**detail, "grace_ends": (end + GRACE).isoformat()})
     taken = 0
     counts = await summary(engine, now)
     for role in ROLES:
@@ -345,6 +448,11 @@ async def watch_periods(engine: Engine, now: datetime | None = None) -> int:
             if await take_back(engine, seat["pc_id"], None, "the seat period ended"):
                 taken += 1
     return taken
+
+
+def _carried_on(grants: list[dict[str, Any]], role: str, end: datetime) -> int:
+    """Seats of this kind that go on past `end` with no gap: a renewal bought ahead starts on (or before) the day the old grant ends."""
+    return sum(g["seats"] for g in grants if g["role"] == role and g["valid_from"] <= end < g["valid_until"])
 
 
 
@@ -369,10 +477,17 @@ async def act(ctx: Context, issue: dict[str, Any], key: str) -> dict[str, Any]:
     from engine.console.plays import _finish
 
     engine = ctx.engine
+    from engine.store import good_grant
+
     added = await engine.store.fetch_grants()
     d = issue["detail"] or {}
-    renewed = any(g["role"] == d.get("role") and g["grant_id"] != d.get("grant_id") and g["valid_until"].isoformat() > str(d.get("valid_until") or d.get("grace_ends") or "")
-                  for g in await valid_grants(engine))
+    good = [g for g in await engine.db.seats.grants() if good_grant(engine, g["envelope"]) is not None]
+    end = d.get("valid_until")
+    if end:                      # renewed when the seats that ended go on, a renewal bought ahead included (it starts the day they end)
+        renewed = _carried_on(good, str(d.get("role")), datetime.fromisoformat(end)) >= int(d.get("seats") or 1)
+    else:                        # (an issue raised before 15 Nov 2026 kept only the grace's end)
+        renewed = any(g["role"] == d.get("role") and g["grant_id"] != d.get("grant_id") and g["valid_until"].isoformat() > str(d.get("grace_ends") or "")
+                      for g in good)
     who = (ctx.viewed_by or ctx.identity).account_id
     await engine.db.issues.log(issue["id"], "acted", f"Asked the store: {added} new grant(s)", who)
     if renewed:

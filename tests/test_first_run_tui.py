@@ -1,8 +1,5 @@
-"""The first-run dialogs, run as a terminal runs them: real keys typed into prompt_toolkit's own dialogs, against a real Engine.
-
-The keys go in one at a time, as a person types them, and what the dialogs draw is captured as text, so a dialog that never
-waits, asks the wrong thing or swallows an answer fails here.
-"""
+"""The first-run dialogs, run as a terminal runs them: real keys into prompt_toolkit's own dialogs. Since 15 Nov 2026 nothing joins from a
+first run (docs/SEATS-AND-SETUP.md): the console and the Worker's `--ui` say how the machine is set up, and wait for the person's Enter."""
 
 from __future__ import annotations
 
@@ -18,96 +15,36 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output.plain_text import PlainTextOutput
 
 from operator_client.core.config import LocalConfig
-from tests.conftest import requires_db
 from worker_client.config import WorkerConfig
 
-pytestmark = [requires_db, pytest.mark.organisation]
-
-LICENCE = {"name": "Falcon", "reference": "ORD-T",
-           "codes": [{"code": "ADMN-TUIT-ESTS-1111", "role": "admin", "seats": 2}, {"code": "WRKR-TUIT-ESTS-2222", "role": "worker", "seats": 2}]}
 ENTER = "\r"
 
 
-async def _next_dialog(seen: object) -> object:
-    """Wait, as a person does, until the next dialog is on the screen (asking the Engine can take a moment)."""
-    from prompt_toolkit.application.current import get_app_or_none
-
-    for _ in range(600):
-        app = get_app_or_none()
-        if app is not None and app is not seen and app.is_running:
-            await asyncio.sleep(0.1)                               # drawn and listening
-            return app
-        await asyncio.sleep(0.05)
-    raise AssertionError("no dialog came up")
-
-
-async def _type(inp, answers: list[str | None]) -> None:
-    """Each answer into its own dialog: the text, Enter to leave the box, Enter on OK. None is a message: one Enter."""
-    seen = None
-    for answer in answers:
-        seen = await _next_dialog(seen)
-        if answer is not None:
-            for ch in answer:
-                inp.send_text(ch)
-                await asyncio.sleep(0.005)
-            inp.send_text(ENTER)
-            await asyncio.sleep(0.15)
-        inp.send_text(ENTER)
-
-
-async def _run(ask, cfg, answers: list[str | None]) -> tuple[object, str]:
+async def _run(ask, cfg) -> tuple[object, str]:
     screen = io.StringIO()
     with create_pipe_input() as inp, create_app_session(input=inp, output=PlainTextOutput(screen)):
-        typing = asyncio.create_task(_type(inp, answers))
-        result = await asyncio.wait_for(ask(cfg), 60)
+        async def press() -> None:
+            await asyncio.sleep(0.6)                              # drawn and listening
+            inp.send_text(ENTER)
+
+        typing = asyncio.create_task(press())
+        result = await asyncio.wait_for(ask(cfg), 30)
         await typing
     return result, screen.getvalue()
 
 
-async def _licence(connect) -> None:
-    a1 = await connect("cid-a1")
-    await a1.ok("licence.import", LICENCE)
-
-
-async def test_the_console_tui_asks_says_what_was_wrong_and_joins(engine, org, connect, tmp_path: Path):
-    from operator_client.tui.app import _ask_setup
-
-    await _licence(connect)
-    cfg = LocalConfig(client_id="", tls=False, path=tmp_path / "operator.json")
-    address = f"127.0.0.1:{engine.port}"
-    # a wrong code first: told so, asked again; then the right one
-    joined, screen = await _run(_ask_setup, cfg, [address, "NOPE-NOPE", None, address, "ADMN-TUIT-ESTS-1111"])
-    assert joined is True and cfg.client_id and cfg.client_key
-    assert "Set up Falcon" in screen and "The Engine's IP address" in screen and "The licence code" in screen
-    assert "That is not a licence code this organisation has." in screen
-    assert "certificate" not in screen                                                  # this Engine needs none: not asked
-
-
-async def test_the_console_tui_left_with_cancel_stays_not_set_up(engine, tmp_path: Path):
+async def test_the_console_tui_says_to_run_the_admin_setup(tmp_path: Path):
     from operator_client.tui.app import _ask_setup
 
     cfg = LocalConfig(client_id="", tls=False, path=tmp_path / "operator.json")
-    screen = io.StringIO()
-    with create_pipe_input() as inp, create_app_session(input=inp, output=PlainTextOutput(screen)):
-        async def cancel() -> None:
-            await asyncio.sleep(0.6)
-            inp.send_text("\t")                                    # from the box to OK
-            await asyncio.sleep(0.1)
-            inp.send_text("\t")                                    # ... to Cancel
-            await asyncio.sleep(0.1)
-            inp.send_text(ENTER)
-
-        typing = asyncio.create_task(cancel())
-        assert await asyncio.wait_for(_ask_setup(cfg), 30) is False
-        await typing
-    assert not cfg.client_id and not cfg.path.exists()
+    joined, screen = await _run(_ask_setup, cfg)
+    assert joined is False and not cfg.client_id and not cfg.path.exists()
+    assert "Set up Falcon" in screen and "Admin setup" in " ".join(screen.split())
 
 
-async def test_the_worker_tui_asks_and_joins_with_a_worker_code(engine, org, connect, tmp_path: Path):
+async def test_the_worker_tui_says_to_run_the_worker_setup(tmp_path: Path):
     from worker_client.firstrun import ask_in_tui
 
-    await _licence(connect)
     cfg = WorkerConfig(client_id="", tls=False, windows=False, path=tmp_path / "worker.json")
-    _, screen = await _run(ask_in_tui, cfg, [f"127.0.0.1:{engine.port}", "WRKR-TUIT-ESTS-2222"])
-    assert cfg.client_id and cfg.client_key
-    assert "Leave it empty to have an IT Admin let it in instead." in screen
+    _, screen = await _run(ask_in_tui, cfg)
+    assert not cfg.client_id and "Worker setup" in " ".join(screen.split())

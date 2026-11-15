@@ -1,9 +1,6 @@
-"""First run, on either side: a machine that is not set up is given the Engine's address and a licence code, and joins.
-
-The console and the Worker ask in their own way (`operator_client/core/firstrun.py`, `worker_client/firstrun.py`); what they
-share is here: reading the address, keeping the certificate, and saying what went wrong so the person can act on it. The
-Engine's certificate stays pinned: a machine with none is asked for it, never connected to unchecked, because the licence
-code would go to whoever answered. Stdlib only.
+"""First run, on either side: what the console and the Worker share when a machine is not set up (reading an address, keeping a
+certificate, saying what went wrong in words). Since 15 Nov 2026 nothing joins from a first run: a machine is set up only by its setup
+(docs/SEATS-AND-SETUP.md). Stdlib only.
 """
 
 from __future__ import annotations
@@ -15,9 +12,8 @@ import socket
 import ssl
 import uuid
 from pathlib import Path
-from typing import Any
 
-from common.connection import ConnectionError_, EngineConnection, EngineError
+from common.connection import ConnectionError_, EngineError
 
 DEFAULT_PORT = 7400
 UNKNOWN_HOST = ("", "127.0.0.1")      # what a machine holds before anyone has told it where its Engine is
@@ -70,14 +66,3 @@ def about_this_machine() -> dict[str, str]:
             "mac": ":".join(f"{(node >> s) & 0xFF:02x}" for s in range(40, -1, -8))}
 
 
-async def join_with_licence(host: str, port: int, *, tls: bool, ca_cert: str | None, code: str, level: str) -> dict[str, Any]:
-    """Join at once with a licence code; nobody confirms it. Answers {client_id, client_key}."""
-    conn = EngineConnection(host, port, client_id="", tls=tls, ca_cert=ca_cert)
-    await asyncio.wait_for(conn.open(), REACH_SECONDS)
-    try:
-        asked = await conn.call("enroll.request", {**about_this_machine(), "level": level, "licence_code": code})
-        if asked.get("status") != "confirmed":
-            raise ValueError("That licence code did not let this machine in.")
-        return await conn.call("enroll.wait", {"token": asked["token"]})
-    finally:
-        await conn.close()

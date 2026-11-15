@@ -166,25 +166,21 @@ async def test_an_account_of_the_parked_role_cannot_sign_in(engine, org, connect
     assert (await (await connect("cid-a1")).ok("hierarchy.tree"))["departments"]
 
 
-async def test_a_machine_with_the_console_installed_is_let_in_as_an_admin_and_is_what_it_asked_to_be(engine, org, connect):
-    """The user, 2 Nov 2026: if a PC has the admin console installed, it plays admin. The admin installer asks as an Admin's workstation; an IT
-    Admin lets it in with the code on its screen; nobody turns a worker install into an Admin, or an Admin's into a worker, at that step."""
+async def test_a_knocking_pc_is_given_a_worker_seat_and_only_a_store_claim_makes_an_admin(engine, org, connect):
+    """Since 15 Nov 2026 (docs/SEATS-AND-SETUP.md): an Admin gives a knocking PC a Worker seat, never an Admin's; an Admin's PC comes in
+    only with the claim the store signed for it (tests/test_admin_claim.py)."""
+    import secrets
+
     from common.connection import EngineConnection
 
     a1 = await connect("cid-a1")
-    machines = []
+    m = EngineConnection("127.0.0.1", engine.port, client_id="", tls=False)               # no key yet: it only knocks
+    await m.open()
     try:
-        for host, level in (("IT-02", "admin"), ("OPS-20", "worker")):
-            m = EngineConnection("127.0.0.1", engine.port, client_id="", tls=False)               # no key yet: it only asks
-            await m.open()
-            machines.append(m)
-            asked = await m.call("enroll.request", {"hostname": host, "os": "Windows 11", "mac": "aa:bb:cc:dd:ee:0" + str(len(machines)),
-                                                    "level": level, "department_id": org["fin"]})
-            other = "worker" if level == "admin" else "admin"
-            assert await a1.err("enroll.confirm", {"enrollment_id": asked["enrollment_id"], "code": asked["code"], "level": other}) == "forbidden"
-            made = await a1.ok("enroll.confirm", {"enrollment_id": asked["enrollment_id"], "code": asked["code"]})
-            assert made["role"] == level
-            assert (await engine.db.accounts.by_id(made["account_id"]))["role"] == level
+        assert (await m.call("knock.hello", {"install_token": secrets.token_urlsafe(24), "hostname": "IT-02", "os": "Windows 11"}))["status"] == "waiting"
+        k = (await a1.ok("knocks.list"))["knocks"][0]
+        made = await a1.ok("seat.give", {"knock_id": k["id"], "department_id": org["fin"], "role": "admin"})   # asking for more changes nothing
+        assert made["role"] == "worker"
+        assert (await engine.db.accounts.pc(made["pc_id"]))["bound_role"] == "worker"         # whatever the PC has installed
     finally:
-        for m in machines:
-            await m.close()
+        await m.close()

@@ -700,3 +700,6 @@ How machines join, replacing the code typed from a machine's screen and the lice
   machine (`seats_one_per_pc`). Machines provisioned before this migration were given a seat row by it.
 - `issues.type` also takes `'seats'` (code prefix `SEA`): a seat period ending (30, 7, 1 days before; `source_table = 'seat_grants:<n>d'`)
   and in its 7 days of grace (`'seat_grants:grace'`), `source_id` the grant.
+- `admin_claims` (migration 057): every Admin claim this Engine accepted (`claim_id` primary key, so a claim works once; `member_email`
+  who signed in to the store; `knock_id`; `pc_id` once in; `envelope` as the store signed it; `used_at`). Checked before it is spent: the
+  store's signature, this Engine's `engine_id`, unexpired, the claim's machine name and hardware identity the knocking PC's, and a free Admin seat.

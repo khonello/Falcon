@@ -1,6 +1,8 @@
 # Installers
 
-**Superseded 14 Nov 2026 by `docs/SEATS-AND-SETUP.md`** (Workers knock and are given seats; Admins sign in to the company account; one setup for everyone plus a signed company file). Kept until each part is replaced.
+**How machines join: `docs/SEATS-AND-SETUP.md` (done 15 Nov 2026).** Workers knock and are given seats; Admins sign in to the company account;
+one setup for everyone plus a store-signed company file. The licence codes, the code typed from a PC's screen, `first-admin.txt` and the
+per-Engine `falcon-client.json` in the PC setups are gone (the Linux `.deb` still makes a first Admin with `first-admin.txt`).
 
 The code behind the installers (decided in `docs/PACKAGING-PLAN.md`). **Deployment is on Windows** (the user, 14 Nov 2026): each machine is
 given one `setup.exe`, built by `installers/windows/build_setup.py` (`engine`, `admin`, `worker`). The Engine's Linux installer (the `.deb`) is
@@ -8,10 +10,9 @@ kept and tested, apart from the Windows one. Nothing here is run by the Engine o
 
 | Machine | setup.exe (Windows) | Or by hand |
 |---|---|---|
-| The server | `falcon-engine-setup.exe` (38 MB): asks the names, the first IT Admin's PC, PostgreSQL's superuser password | `python -m installers.windows.engine_install --names ... --hostname IT-01 --admin-url-file pg.txt`; Linux: `sudo python3 -m installers.engine.install --names ... --hostname IT-01` |
-| A person's PC | `python -m installers.windows.install --role worker --bundle falcon-client.json` | Windows, as administrator |
-| The first IT Admin's workstation | `... --role admin --bundle falcon-client.json --client-id <id> --client-key-file key.txt` | Windows, as administrator |
-| Another IT Admin's workstation | `... --role admin --bundle falcon-client.json` | Windows, as administrator |
+| The server | `falcon-engine-setup.exe`: asks the names and port; carries Falcon's own PostgreSQL; signs in to the store | `python -m installers.windows.engine_install --names ... --store https://<store> [--company-name ...]`; Linux: `sudo python3 -m installers.engine.install --names ... --hostname IT-01` |
+| A person's PC | `python -m installers.windows.install --role worker --company acme.falcon` (setup.exe: the `.falcon` beside it, or `/COMPANY=`) | Windows, as administrator |
+| An IT Admin's workstation (the first one too) | `... --role admin --store https://<store>`: signs in, takes a free Admin seat | Windows, as administrator, with the internet |
 
 Each is run from a **payload folder**: `python -m installers.payload <role> <folder> [--wheels <folder>]` assembles the role's packages (and
 only those), the libraries it needs (read from `pyproject.toml`), this installer, and a `manifest.json` of the SHA-256 of every file. Every
@@ -20,7 +21,15 @@ installer checks the manifest first and refuses a payload that was changed or ha
 
 ## The order
 
-1. **The Engine's installer, on the server.** On Windows (`falcon-engine-setup.exe`, PostgreSQL installed first): the program in
+1. **The Engine's installer, on the server.** *Since 15 Nov 2026 on Windows (docs/SEATS-AND-SETUP.md section 4):* nothing is installed
+   first. The setup carries Falcon's own PostgreSQL (EDB's binaries, trimmed to 105 MB) and sets it up private to Falcon
+   (`installers/windows/private_pg.py`): programs in `<Falcon Engine>\pgsql`, never on PATH; data in `C:\ProgramData\Falcon Engine\pgdata`,
+   readable only by its own account; localhost only, a port of its own (from 54320); only the Engine's role may log in; the
+   **FalconPostgres** service as `NT SERVICE\FalconPostgres`; a machine's own PostgreSQL is never touched. It makes no first Admin: it
+   signs in to the store and registers the Engine (`store.json`, `company.falcon` in the data folder), and the first IT Admin runs the
+   Admin setup. *Drilled for real, 15 Nov 2026* (`scripts/private_pg_drill.py`): its own port, the Engine's role in, the superuser and
+   every other database refused, localhost only, its own account, nothing on PATH, repaired on a second run, removed cleanly.
+   *Before that (14 Nov 2026), on Windows* (`falcon-engine-setup.exe`, PostgreSQL installed first): the program in
    `C:\Program Files\Falcon Engine`, its settings and secrets in `C:\ProgramData\Falcon Engine` (system and administrators only), a PostgreSQL
    role with a made-up password, `engine setup`, the firewall rule, the **FalconEngine** service; it writes `falcon-client.json` and
    `first-admin.txt` in that folder and prints the fingerprint. *Run for real, 14 Nov 2026:* installed silently (`/ANSWERS=`), a console signed in
@@ -30,7 +39,7 @@ installer checks the manifest first and refuses a payload that was changed or ha
    certificate, **no key**, and prints the certificate's **fingerprint**. The first IT Admin's id and key are in
    `/var/lib/falcon/first-admin.txt` (root only). Back up `/var/lib/falcon/master.secret` offline.
 2. **The first IT Admin's workstation.** `--role admin` with the id and key from step 1: the console, and the person's own settings.
-**With a licence code (2 Nov 2026):** every installer takes `--code` (or `--code-file`; `setup.exe` asks for it on a page of its own). An admin
+**Gone 15 Nov 2026 -- with a licence code (2 Nov 2026):** every installer takes `--code` (or `--code-file`; `setup.exe` asks for it on a page of its own). An admin
 code with the admin installer, a worker code with the worker one: the machine joins the Engine at once, as what the code is for, and nobody
 confirms it. The code is kept only in the machine's private settings until it is used, then dropped. Without one, the steps below.
 
@@ -85,12 +94,14 @@ first account and issued nothing new. **The `.deb`, run for real (WSL Ubuntu, 12
 
 ## setup.exe (built 1 Nov 2026)
 
-`python -m installers.windows.build_setup worker --python <folder> --bundle falcon-client.json --out <short folder>` makes
+`python -m installers.windows.build_setup worker --python <folder> --out <short folder>` makes
 `falcon-worker-setup.exe` (93 MB): the payload, the role's libraries as wheels (no network at install), and Python. The Python is
 python.org's full Windows layout, the `tools` folder of its NuGet package (`https://www.nuget.org/api/v2/package/python/3.10.11`; decided
 by the user, 1 Nov 2026). It is installed under the program (`<target>\python`), because the runtime is a venv made from it. Build into a
 short path (`C:b\dist`): a deep one passes Windows' 260-character limit and Inno Setup says "cannot find the path". One setup.exe is
-made per Engine, since it carries that Engine's bundle. Needs Inno Setup 6. `admin` makes `falcon-admin-setup.exe` (94 MB: the console runs
+the same for every customer (15 Nov 2026, docs/SEATS-AND-SETUP.md): a Worker's setup carries no Engine and is told where it is by the
+store-signed company file beside it (`<company>.falcon`, or `/COMPANY=`); the Admin's is built with `--store https://<store>` and signs in
+to the company account at install, which gives it the Engine and this PC's Admin claim. Needs Inno Setup 6. `admin` makes `falcon-admin-setup.exe` (94 MB: the console runs
 on PySide6-Essentials, as the Worker's windows do; the full PySide6 made it 259 MB).
 
 **Run for real (13-14 Nov 2026, on the development PC, then removed):** both setup.exe files, silently, as an administrator: all ten steps,

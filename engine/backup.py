@@ -21,6 +21,10 @@ WINDOWS_PLACES = [Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "P
 
 
 def tool(name: str) -> str | None:
+    own = os.environ.get("FALCON_PG_BIN")
+    if own:                                                    # an installed Engine's own PostgreSQL: its tools only, never another install's
+        exe = Path(own) / (f"{name}.exe" if os.name == "nt" else name)
+        return str(exe) if exe.is_file() else None
     found = shutil.which(name)
     if found:
         return found

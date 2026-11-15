@@ -1,9 +1,11 @@
 ; Inno Setup wrapper: turns a payload folder into one setup.exe for a role. The work is done by installers/windows/install.py; this only
 ; carries the payload and a Python, asks for administrator rights, and runs it. Built by installers/windows/build_setup.py, which runs:
 ;
-;     iscc /DRole=worker /DPayload=out\falcon-worker /DBundle=falcon-client.json /DPython=out\python installers\windows\falcon.iss
+;     iscc /DRole=worker /DPayload=out\falcon-worker /DPython=out\python installers\windows\falcon.iss
+;     iscc /DRole=admin /DStore=https://<store> ...
 ;
-; Roles: worker, admin. The bundle is the Engine's falcon-client.json (address and certificate, no key). The Python is python.org's full
+; Roles: worker, admin. Neither names an Engine: one setup serves every customer (docs/SEATS-AND-SETUP.md). A Worker's is told where its
+; Engine is by the store-signed company file beside it; an Admin's signs in to the store and learns it there. The Python is python.org's full
 ; layout (its NuGet package), installed under the program and not unpacked to a temporary folder: the runtime is a venv made from it, and a
 ; venv needs the Python it was made from for as long as it lives.
 
@@ -13,8 +15,10 @@
 #ifndef Payload
   #define Payload "out\falcon-" + Role
 #endif
-#ifndef Bundle
-  #define Bundle "falcon-client.json"
+#if Role == "admin"
+  #ifndef Store
+    #error the Admin setup signs in to the store: build it with /DStore=https://...
+  #endif
 #endif
 #ifndef Python
   #define Python "python"
@@ -38,7 +42,6 @@ SolidCompression=yes
 
 [Files]
 Source: "{#Payload}\*"; DestDir: "{tmp}\payload"; Flags: recursesubdirs createallsubdirs ignoreversion
-Source: "{#Bundle}"; DestDir: "{tmp}\payload"; DestName: "falcon-client.json"; Flags: ignoreversion
 ; the Python the runtime is made from, kept with the program
 Source: "{#Python}\*"; DestDir: "{app}\python"; Flags: recursesubdirs createallsubdirs ignoreversion
 
@@ -59,46 +62,29 @@ Type: filesandordirs; Name: "{app}\install-log.txt"
 Type: dirifempty; Name: "{app}"
 
 [Code]
-{ The licence code (the user, 2 Nov 2026): an admin code for the admin installer, a worker code for the worker one. With it the machine joins
-  the Engine at once and nobody has to confirm it; left empty, the machine asks and an IT Admin lets it in with the code shown on its screen.
-  It reaches the installer in a file in Setup's own temporary folder, never on a command line, and the installer keeps it only in the
-  machine's private settings until it is used. }
+{ Nothing is typed (docs/SEATS-AND-SETUP.md): a Worker learns where its Engine is from the company file beside this setup and knocks until
+  an Admin gives it a seat; an Admin's PC signs in to the company's account in the browser and comes in with the claim that sign-in gives. }
 var
-  CodePage: TInputQueryWizardPage;
-#if Role == "admin"
-  FirstAdminPage: TInputFileWizardPage;
-#endif
   InstallFailed: Boolean;
 
-procedure InitializeWizard;
-begin
-  CodePage := CreateInputQueryPage(wpSelectDir, 'Licence code',
-    'The code from your Falcon licence',
-    'Type the {#Role} code from the licence your organisation bought. The machine then joins on its own. ' +
-    'Leave it empty to have an IT Admin let it in instead.');
-  CodePage.Add('Licence code:', False);
-#if Role == "admin"
-  // The first IT Admin's PC cannot join by a code: nobody is there yet to confirm it. It is given the Engine's first-admin.txt instead.
-  FirstAdminPage := CreateInputFilePage(CodePage.ID, 'The first IT Admin',
-    'Only for the very first IT Admin''s PC',
-    'If this is the first IT Admin''s PC, choose the first-admin.txt the Engine''s installer left in C:\ProgramData\Falcon Engine on the ' +
-    'Engine''s machine (copy it here first). Leave it empty for any other Admin: that PC joins with the code it shows.');
-  FirstAdminPage.Add('first-admin.txt:', 'Text files|*.txt|All files|*.*', '.txt');
-#endif
-end;
-
-function FirstAdminArg: String;
+// Where the Engine is. A Worker: the store-signed company file beside this setup (or /COMPANY=), the same setup for every customer.
+// An Admin: it signs in to the store in the browser and learns it there (docs/SEATS-AND-SETUP.md section 5; internet required).
+function PlaceArg: String;
 var
-  Path: String;
+  Given: String;
+  Found: TFindRec;
 begin
-  Result := '';
-  Path := ExpandConstant('{param:FIRSTADMIN|}');
 #if Role == "admin"
-  if Path = '' then
-    Path := Trim(FirstAdminPage.Values[0]);
+  Result := '--store "{#Store}"';
+#else
+  Given := ExpandConstant('{param:COMPANY|}');
+  if (Given = '') and FindFirst(ExpandConstant('{src}\*.falcon'), Found) then
+  begin
+    Given := ExpandConstant('{src}\') + Found.Name;
+    FindClose(Found);
+  end;
+  Result := '--company "' + Given + '"';
 #endif
-  if Path <> '' then
-    Result := ' --first-admin-file "' + Path + '"';
 end;
 
 // The installer, with what it says kept in the program folder's install-log.txt. If it fails, the person is shown the end of that log (or, installing
@@ -111,10 +97,13 @@ var
 begin
   Py := ExpandConstant('{app}\python\python.exe');
   Log := ExpandConstant('{app}\install-log.txt');
-  Args := '-m installers.windows.install --role {#Role} --bundle "' + ExpandConstant('{tmp}\payload\falcon-client.json') + '" --source "' +
-          ExpandConstant('{tmp}\payload') + '" --target "' + ExpandConstant('{app}') + '" --python "' + Py + '" --code-file "' +
-          ExpandConstant('{tmp}\licence-code.txt') + '"' + FirstAdminArg;
+  Args := '-m installers.windows.install --role {#Role} ' + PlaceArg + ' --source "' +
+          ExpandConstant('{tmp}\payload') + '" --target "' + ExpandConstant('{app}') + '" --python "' + Py + '"';
+#if Role == "admin"
+  WizardForm.StatusLabel.Caption := 'Installing Falcon. Sign in to your company''s Falcon account in the browser when it opens.';
+#else
   WizardForm.StatusLabel.Caption := 'Installing Falcon...';
+#endif
   if not Exec(ExpandConstant('{cmd}'), '/C ""' + Py + '" ' + Args + ' > "' + Log + '" 2>&1"', ExpandConstant('{tmp}\payload'), SW_HIDE,
               ewWaitUntilTerminated, Code) or (Code <> 0) then
   begin
@@ -134,8 +123,6 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if CurStep = ssInstall then
-    SaveStringToFile(ExpandConstant('{tmp}\licence-code.txt'), Trim(CodePage.Values[0]), False);
   if CurStep = ssPostInstall then
     RunInstaller;
 end;

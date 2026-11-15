@@ -101,7 +101,7 @@ class EngineConnection:
 
     async def open(self) -> None:
         """Connect WITHOUT the handshake: for a machine that has no key yet and may only ask to be registered
-        (`enroll.request`, `enroll.wait`). Everything else is refused by the Engine until `connect()` has authenticated."""
+        (`knock.hello`). Everything else is refused by the Engine until `connect()` has authenticated."""
         ssl_ctx = self._ssl_context()
         self._reader, self._writer = await asyncio.open_connection(
             self.host, self.port, ssl=ssl_ctx, server_hostname=self.host if ssl_ctx else None,

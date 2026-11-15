@@ -105,7 +105,10 @@ Knocks no longer expire; a PC knocks until it is seated or uninstalled.
   makes a new one. The Engine asks the store once a day (and when an Admin asks: TUI `seats refresh`) for grants it has not seen, and adds
   them. It never re-checks one it has.
 - **Free seats** = seats in valid grants of that kind, minus those in use.
-- **The end of a period**: issues are raised for the Admins 30, 7 and 1 days before a grant ends, and during its grace. After the end come
+- **The end of a period**: issues are raised for the Admins 30, 7 and 1 days before a grant ends, and during its grace: one issue for all
+  the grants of a kind ending on one day ("60 Worker seats end on…", a top-up ending with its main grant), and none for seats a renewal
+  bought ahead carries on with no gap; Look now resolves it on such a renewal too. The period itself is the store's (yearly, see
+  `docs/STORE-CONTRACT.md` section 4); the Engine enforces whatever dates a grant has. After the end come
   **7 days of grace**; machines keep working. After the grace, if more seats are in use than valid grants cover, **the most recently given
   seats over the count are taken back**, audited and announced; those PCs knock again.
 - **Admin seats**: any Admin may take back any Admin's seat; **the last Admin seat can never be taken**.
@@ -144,14 +147,14 @@ The Engine's certificate is valid for 10 years; renewal is rare, but a lapse wou
 | Step | What | Waits on |
 |---|---|---|
 | 0 | these documents | — |
-| 1 | `docs/STORE-CONTRACT.md`, `common/ed25519.py` (stdlib verify, RFC 8032 vectors), `common/store_keys.py`, `scripts/store_stub.py` | — |
-| 2 | the Engine: knocks, seats, grants, grace (migration 056), TUI commands | 1 |
-| 3 | the Worker: knocking, the company file in the setup | 2 |
-| 4 | the Admin claim, end to end against the store stub | 1, 2 |
-| 5 | the Engine setup: the private PostgreSQL, then store registration | a yes for the PostgreSQL binaries download (~300 MB) |
-| 6 | certificate renewal | 2 |
-| 7 | the Machines page, handed to the design session | 2 |
-| 8 | the old joining code removed; docs; drills | 2–6 |
+| 1 | `docs/STORE-CONTRACT.md`, `common/ed25519.py` (stdlib verify, RFC 8032 vectors), `common/store_keys.py`, `scripts/store_stub.py` (done 14 Nov 2026) | — |
+| 2 | the Engine: knocks, seats, grants, grace (migration 056), TUI commands (done 14 Nov 2026) | 1 |
+| 3 | the Worker: knocking, the company file in the setup (done 15 Nov 2026) | 2 |
+| 4 | the Admin claim, end to end against the store stub (done 15 Nov 2026; migration 057) | 1, 2 |
+| 5 | the Engine setup: the private PostgreSQL, then store registration (done 15 Nov 2026; PostgreSQL 18.3 binaries from EDB, drilled) | a yes for the PostgreSQL binaries download (~300 MB) |
+| 6 | certificate renewal (done 15 Nov 2026; `engine/certs.py`) | 2 |
+| 7 | the Machines page, handed to the design session (done 15 Nov 2026; docs/UI-WORK-FROM-ENGINE.md) | 2 |
+| 8 | the old joining code removed; docs; drills (code and docs done 15 Nov 2026; drills: see section 12) | 2–6 |
 
 Outside this session: the store itself (the `store/` session, built to `docs/STORE-CONTRACT.md`); the Paddle account (the user); a
 code-signing certificate for the setups (to buy before shipping).

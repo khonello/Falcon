@@ -102,71 +102,52 @@ def probe() -> dict[str, Any]:
     return out
 
 
-REGISTER_AGAIN_SECONDS = 600.0
-UNREACHABLE_AGAIN = (5.0, 15.0, 30.0, 60.0, 120.0)        # the Engine not answering yet (off, or the network not up): asked again soon, then every 2 minutes
 
 
 async def _wait_to_be_registered(cfg: Any, stop_event: asyncio.Event) -> None:
-    """A machine installed with no key of its own: ask the Engine to register it (it waits on probation, shows a code in the
-    person's session, and an Admin confirms), then carry on with the key it is handed. A refused or expired
-    request is asked again after a while: the service never gives up and never registers itself."""
-    from worker_client.enroll import EnrollmentEnded, enroll
-    from worker_client.windows.spawn import open_window
-
-    async def show(spec: dict[str, Any]) -> Any:
-        return await open_window("message", {**spec, "from": ""})
-
+    """A machine installed with no key of its own knocks until it is let in (docs/SEATS-AND-SETUP.md): a Worker when an Admin gives it a
+    seat, an Admin's PC at once with the claim its Admin setup left. It never gives up, and never lets itself in. Not set up at all (no
+    Engine named: the setup was not run with the company file), it tells the Falcon program so, and waits to be stopped."""
     from worker_client.firstrun import FirstRun, needs_setup
+    from worker_client.knock import knock
 
-    if needs_setup(cfg) and cfg.windows:
-        await FirstRun(cfg).run(stop_event)         # nobody has said where the Engine is: the Falcon program asks
-    tries = 0
-    while not cfg.client_id and not stop_event.is_set():
-        task = asyncio.create_task(enroll(cfg, department_id=cfg.enroll_department, level=cfg.enroll_level,
-                                          show=lambda m: log.info("%s", m), window=show if cfg.windows else None))
-        stopped = asyncio.create_task(stop_event.wait())
-        await asyncio.wait({task, stopped}, return_when=asyncio.FIRST_COMPLETED)
-        if not task.done():
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
-            return
-        stopped.cancel()
-        wait = 0.0
-        try:
-            task.result()
-            tries = 0
-        except EnrollmentEnded as exc:
-            log.warning("not registered: %s; asking again in %.0f minutes", exc, REGISTER_AGAIN_SECONDS / 60)
-            wait = REGISTER_AGAIN_SECONDS
-        except (OSError, ConnectionError, asyncio.TimeoutError) as exc:
-            # The Engine cannot be reached yet. This used to end the service, and after three restarts Windows stopped starting it: a PC
-            # installed while the Engine was off stayed off it until someone restarted the PC (found installing setup.exe, 14 Nov 2026).
-            wait = UNREACHABLE_AGAIN[min(tries, len(UNREACHABLE_AGAIN) - 1)]
-            tries += 1
-            log.warning("the Engine at %s:%s does not answer (%s); asking again in %.0f s", cfg.engine_host, cfg.engine_port, exc, wait)
-        if wait:
-            try:
-                await asyncio.wait_for(stop_event.wait(), wait)
-            except asyncio.TimeoutError:
-                pass
+    if needs_setup(cfg):
+        log.warning("not set up: this machine has not been told where its Engine is (run the Worker setup with the company file)")
+        if cfg.windows:
+            await FirstRun(cfg).run(stop_event)
+        else:
+            await stop_event.wait()
+        return
+    await knock(cfg, stop_event)
 
 
 async def _run_worker(config: str | None, stop_event: asyncio.Event) -> None:
     from worker_client.config import WorkerConfig
-    from worker_client.service import WorkerService
+    from worker_client.service import SeatTaken, WorkerService
 
     cfg = WorkerConfig.load(Path(config) if config else None)
-    if not cfg.client_id:
-        await _wait_to_be_registered(cfg, stop_event)
+    while not stop_event.is_set():
         if not cfg.client_id:
-            return                                  # stopped while waiting
-    cfg.separate_programs = True            # as a service the indexer and the event tracker are their own supervised programs
-    svc = WorkerService(cfg, native_watch=True, allow_power=False)
-    await svc.start()
-    try:
-        await stop_event.wait()
-    finally:
-        await svc.stop()
+            await _wait_to_be_registered(cfg, stop_event)
+            if not cfg.client_id:
+                return                              # stopped while waiting
+        cfg.separate_programs = True        # as a service the indexer and the event tracker are their own supervised programs
+        svc = WorkerService(cfg, native_watch=True, allow_power=False)
+        try:
+            await svc.start()
+        except SeatTaken:
+            await svc.stop()
+            continue                                # its seat was taken back: knock again
+        stopped = asyncio.ensure_future(stop_event.wait())
+        taken = asyncio.ensure_future(svc.seat_taken.wait())
+        try:
+            await asyncio.wait({stopped, taken}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for w in (stopped, taken):
+                w.cancel()
+            await svc.stop()
+        if not svc.seat_taken.is_set():
+            return
 
 
 class _Run:

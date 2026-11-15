@@ -13,7 +13,7 @@ run no Worker, so what it sends is all they say. Files live under `data/seed/` (
 
 What it leaves, by page:
   Machines       3 departments and an empty one; machines on with someone signed in, one that was on and went off, one never connected,
-                 Detective's machines, a second Admin's workstation, and a machine waiting for its licence code
+                 Detective's machines, a second Admin's workstation, and a machine knocking for a seat
   Actions        Falcon's own library, three of ADM-01's and one of ADM-02's; runs that worked, failed, ran out of time, were stopped by
                  hand, and one still running
   Automation     on a schedule, every few minutes, on an event, on a threshold, one switched off, one that keeps failing, one by ADM-02,
@@ -67,7 +67,7 @@ MACHINES = [  # host, department, the person at it, what it does in the seed
     ("LOG-02", "Logistics", "Kwame Boadu", "never"),        # registered, never connected
 ]
 SECOND_ADMIN = ("ADM-02", "Finance", "Abena Ofori")
-WAITING_MACHINE = "LOG-03"                                  # installed without a licence code: it waits to be let in
+WAITING_MACHINE = "LOG-03"                                  # installed, knocking: it waits for an Admin to give it a seat
 
 FOLDERS = {"WS-D1": ["Documents", "Reports"], "WS-D2": ["Inbox"], "WS-D3": ["Shared", "Archive", "Old"], "WS-D4": ["Documents"],
            "FIN-01": ["Invoices", "Prices", "Inbox"], "LOG-01": ["Deliveries"], "ADM-01": ["Finance", "HR", "Board", "Payroll"]}
@@ -189,7 +189,9 @@ class Seed:
         c = EngineConnection(cfg["engine_host"], cfg["engine_port"], client_id="", tls=cfg["tls"], ca_cert=cfg.get("ca_cert"))
         try:
             await c.open()
-            await step(f"{WAITING_MACHINE}, installed without a licence code", c.call("enroll.request", {"hostname": WAITING_MACHINE, "os": "Windows 11 Pro"}))
+            await step(f"{WAITING_MACHINE}, knocking for a seat", c.call("knock.hello", {"install_token": "seed-dev-" + WAITING_MACHINE + "-install-token",
+                                                                                     "hostname": WAITING_MACHINE, "os": "Windows 11 Pro",
+                                                                                     "hardware_id": "seed/" + WAITING_MACHINE, "user": "ama"}))
         finally:
             await c.close()
 

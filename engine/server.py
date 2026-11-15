@@ -15,6 +15,7 @@ from typing import Any
 
 # Importing the combo packages registers their handlers.
 import engine.auth
+import engine.certs
 import engine.console
 import engine.control
 import engine.detective
@@ -112,16 +113,17 @@ class Engine:
         from engine.console import screens as console_screens
         from engine.control import executions as control_executions
         from engine.control import inventory as control_inventory
-        from engine.hierarchy import licences
         from engine.hierarchy import seats as hierarchy_seats
         from engine.task import expected as task_expected
 
         for mod in (control_events, control_executions, control_inventory, flow_sync, console_screens, console_marks, engine.detective, task_expected,
-                    licences, hierarchy_seats, engine.places):
+                    hierarchy_seats, engine.places):
             mod.reset_state()
         self._conn_tasks: set[asyncio.Task[Any]] = set()
+        from engine.certs import Certificates
         from engine.store import StoreLink
 
+        self.certs = Certificates(self)                # the certificate renews itself (docs/SEATS-AND-SETUP.md section 10)
         self.store = StoreLink(self)                   # who this Engine is at the store, and its seat grants (docs/SEATS-AND-SETUP.md)
 
     async def announce(self, kind: str, data: dict[str, Any] | None = None, *, source: str = "human", pc: int | None = None, cause: Any = None) -> Any:
@@ -247,6 +249,7 @@ class Engine:
 
         await traversal.claim_native_session(self, conn.ctx)
         await self._presence(conn, online=True)
+        await self.certs.on_connected(conn)
         if conn.ctx.identity.pc_id is not None:
             from engine.console import issues
 
@@ -351,6 +354,7 @@ class Engine:
                              "Set FALCON_DEV_PLAINTEXT=1 only for local development.")
         ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ctx.load_cert_chain(certfile=str(s.tls_cert), keyfile=str(s.tls_key))
+        self.certs.ssl_context = ctx                     # a switch to the next certificate loads it here: new connections get it
         return ctx
 
 

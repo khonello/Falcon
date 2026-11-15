@@ -160,6 +160,47 @@ async def test_a_period_warns_then_grace_then_the_newest_seats_over_the_count_go
     assert len(await engine.db.issues.list(type_="seats")) == len(titles)                   # nor raised twice
 
 
+async def test_grants_ending_on_one_day_warn_once_and_a_renewal_bought_ahead_warns_not_at_all(engine, org, connect, monkeypatch):
+    _registered(engine, monkeypatch)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    end = now + timedelta(days=20)
+    await add_grants(engine, [_grant("worker", 50, now - timedelta(days=345), end),                # the main grant
+                              _grant("worker", 10, now - timedelta(days=100), end),                # a top-up, ending with it
+                              _grant("admin", 2, now - timedelta(days=345), end),
+                              _grant("admin", 2, end, end + timedelta(days=365))])                 # the Admin seats, renewed ahead
+    await seats.watch_periods(engine, now)
+    found = await engine.db.issues.list(type_="seats")
+    assert [i["title"] for i in found] == [f"60 Worker seats end on {end.strftime('%d %b %Y')}"]
+    await seats.watch_periods(engine, now)
+    assert len(await engine.db.issues.list(type_="seats")) == 1                                       # nor raised twice
+
+    # in the grace, still one, and it says how many
+    await seats.watch_periods(engine, end + timedelta(days=2))
+    grace = [i for i in await engine.db.issues.list(type_="seats") if "ended" in i["title"]]
+    assert len(grace) == 1 and grace[0]["title"].startswith("60 Worker seats ended on")
+    lead, facts, _, _ = seats.view(await engine.db.issues.get(grace[0]["id"]))
+    assert lead.startswith("60 Worker seats have ended") and ["Seats", "60 Worker"] in facts
+
+
+@pytest.mark.organisation                       # (a seats issue is no department's: version 1's IT Admins see it)
+async def test_look_now_sees_a_renewal_bought_ahead(engine, org, connect, monkeypatch):
+    _registered(engine, monkeypatch)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    end = now + timedelta(days=5)
+    await add_grants(engine, [_grant("worker", 20, now - timedelta(days=360), end)])
+    await seats.watch_periods(engine, now)
+    issue = (await engine.db.issues.list(type_="seats"))[0]
+    await add_grants(engine, [_grant("worker", 20, end, end + timedelta(days=365))])                   # renewed; it starts when the old one ends
+
+    async def nothing_new() -> int:
+        return 0
+
+    monkeypatch.setattr(engine.store, "fetch_grants", nothing_new)
+    a1 = await connect("cid-a1")
+    got = await a1.ok("issues.act", {"issue_id": issue["id"], "key": "check"})
+    assert got["issue"]["state"] == "resolved"
+
+
 async def test_the_tui_lists_knocks_gives_and_takes_back_a_seat(engine, org, tmp_path):
     from operator_client.tui.shell import run_script
     from tests.test_operator_client import _cfg

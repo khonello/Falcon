@@ -26,20 +26,21 @@ will use in `--names` the first time: `--names falcon.internal,192.168.50.10,192
 
 ## Once, on every machine (needs the internet: do it before case 3)
 
-**Superseded 14 Nov 2026 by `docs/SEATS-AND-SETUP.md`** (Workers knock and are given seats; Admins sign in to the company account; one setup for everyone plus a signed company file). Kept until each part is replaced. The network part of this page (the three cases, `falcon.internal`, the checks) stands.
+**With the installers (since 15 Nov 2026, `docs/SEATS-AND-SETUP.md`), nothing is installed by hand and nothing is typed.** Three setups, the
+same for every customer, built once on the development PC: `build_setup engine --pgsql <EDB pgsql folder> --store <store>`, `build_setup
+admin --store <store>`, `build_setup worker`. **They need the store** (the Engine's and the Admin's setups sign in to it): until the store
+session has one running, see *Before the store exists* below.
 
-**With the installers (14 Nov 2026), nothing is installed by hand: no Python, no clone.** Three files, built on the development PC with
-`python -m installers.windows.build_setup engine|admin|worker --python <python 3.10 folder> [--bundle falcon-client.json]`:
+1. **ENG-01:** run `falcon-engine-setup.exe` as an administrator, with the internet: names `falcon.internal`, port 7400, the company's name,
+   yes to the model; sign in in the browser. Its own PostgreSQL comes with it. It registers the Engine with the store and makes no Admin.
+2. **IT-01** (the first IT Admin): run `falcon-admin-setup.exe`, with the internet; sign in to the same account in the browser. The PC takes
+   a free Admin seat and is in at once; the console opens signed in.
+3. **WS-01, WS-02:** from IT-01's console, Machines, **Download Worker setup** (until the page has it: `company-file <folder>` in the TUI,
+   put beside `falcon-worker-setup.exe`). Run it on each. Each knocks; give each a seat on IT-01 (Machines, Waiting for a seat; or `knocks`,
+   `seat give <knock> <department>`).
 
-1. **ENG-01:** install PostgreSQL (postgresql.org), then run `falcon-engine-setup.exe` as an administrator: names `falcon.internal`, first
-   IT Admin's PC `IT-01`, PostgreSQL's superuser password, and yes to the model. It leaves `falcon-client.json` and `first-admin.txt` in
-   `C:\ProgramData\Falcon Engine`. Copy `falcon-client.json` back to the development PC and build the two client setups with it:
-   `build_setup admin --bundle falcon-client.json ...` and `build_setup worker --bundle falcon-client.json ...` (each setup.exe carries
-   this Engine's address and certificate).
-2. **IT-01** (the first IT Admin): copy `first-admin.txt` from ENG-01, run `falcon-admin-setup.exe`, and choose that file on its
-   *The first IT Admin* page (silent: `/FIRSTADMIN=C:\pathirst-admin.txt`). The console then signs in as that Admin; delete the file after.
-   Its service asks to be registered: let it in from that console with the code it shows.
-3. **WS-01, WS-02:** `falcon-worker-setup.exe`. Each shows a code and waits; the IT Admin lets it in with that code (Machines, Asking to join).
+**Before the store exists:** the setups cannot sign in to anything yet. To be decided with the user: either wait for the store, or a
+**test-only** build that signs in to `scripts/store_stub.py` running on ENG-01 and trusts its test key (never to be given to a customer).
 
 **By hand instead** (from a clone, the development way):
 
