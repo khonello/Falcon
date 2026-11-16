@@ -5,8 +5,8 @@ matters now: **a version a company can buy, install and run.**
 
 Read this file first. It is the whole picture; everything else is reference.
 
-> **PARKED, 15 Nov 2026 (the user).** No development continues unless the user says so. The new product, forked from this, starts at
-> `docs/next-product/START-HERE.md`. Where Falcon was left:
+> **PARKED, 15 Nov 2026 (the user).** No development continues unless the user says so. The new product, Raven, forked from this on 16 Nov 2026, is in `..\Raven`
+> (github.com/khonello/Raven): start there at `docs/next-product/START-HERE.md`. Where Falcon was left:
 > - **Done and tested:** the Engine and both clients; how machines join (`docs/SEATS-AND-SETUP.md`, steps 0-9: Workers knock and are
 >   given seats, Admins sign in to the store and come in with a signed claim, seats from store-signed grants, certificate renewal); the
 >   Engine's installer on **Windows** (`falcon-engine-setup.exe`, its own private PostgreSQL) and on **Linux** (the `.deb`, its own private
