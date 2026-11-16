@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 > **Falcon is PARKED (15 Nov 2026, `PARKED.md`): do not build here.** Work moved to **Raven**, forked from this repository on 16 Nov 2026: `..\Raven`
-> (github.com/khonello/Raven, private). Everything about Raven lives there (`docs/next-product/START-HERE.md`, `RAVEN-MAP.md`), not here.
+> (github.com/khonello/Raven, private). Everything about Raven lives there (`START-HERE.md`, `docs/RAVEN-MAP.md`), not here.
 > Everything below describes Falcon.
 
 ## Repository state
