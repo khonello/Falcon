@@ -304,15 +304,17 @@ worth keeping as the base the new QML is built on. The Worker's three QML files 
 No repo query names these, so they look dead already (confirm with a grep before the baseline in section 8):
 `assisted_access_requests`, `listeners`, `enrollments`, `licences`, `licence_codes`.
 
-## 7. Decisions the user has not made
+## 7. Decisions
 
-Each has a recommendation. Nothing in cuts A to D depends on them.
+**Answered by the user, 16 Nov 2026:** D1 conversations go out ("we are yet to truly define the direction and feel of Raven"); D2 announcements
+go out; D4 entering a machine stays ("perfect, we will find a way to make use of that"); D5 act-on-a-machine stays. **Still open: D3**
+(rules, deviations, reports). D1 and D2 are cut E, after D; D3, if it goes, is cut F. Nothing in cuts A to D depends on them.
 
 | | Question | What it covers | Recommended |
 |---|---|---|---|
 | D1 | Do conversations stay? | `resource/conversations.py`, `chatfiles.py`, `talk.py` ("Ask IT"), `worker_client/chatfiles.py`, TUI `conversations.py`, Messages pages. 630 Engine lines, 5 tables | **Out.** Raven watches and tells; it is not a messenger. One thing to keep in mind: containment's blocker "asks the person to tell the Admin", which may want a one-line channel later, far smaller than this |
 | D2 | Do announcements stay? | `hierarchy/alerts.py`, the emergency overlay, the Worker program's Announcements tab | **Out** |
-| D3 | Do rules, deviations and reports stay? | `console/rules.py`, `deviations.py`, `accountability.py`, `hierarchy/reports.py`, `auditing.py`; `accountability` is imported by 9 kept modules (`auth`, `accounts`, `traversal`, `resource`, `updates`, `scheduler`...) and `reports.emit` by 5 | **Out, as its own cut E after D**: cases and issues are Raven's way of saying something is wrong; a second system of "deviations from rules" beside them is Falcon's Super User accountability. It is a real cut (run `cut_edges.py` on those five modules to list the call sites), so it gets its own step |
+| D3 | Do rules, deviations and reports stay? | `console/rules.py`, `deviations.py`, `accountability.py`, `hierarchy/reports.py`, `auditing.py`; `accountability` is imported by 9 kept modules (`auth`, `accounts`, `traversal`, `resource`, `updates`, `scheduler`...) and `reports.emit` by 5 | **Out, as its own cut F**: cases and issues are Raven's way of saying something is wrong; a second system of "deviations from rules" beside them is Falcon's Super User accountability. It is a real cut (run `cut_edges.py` on those five modules to list the call sites), so it gets its own step |
 | D4 | Does entering a machine stay? | `hierarchy/traversal.py` (sessions, blocking), `console/screens.py`, `worker_client/screenstream.py`, `lockout.py`, `helper.py` | **Keep for now.** Looking at a machine's screen is evidence-adjacent and containment may use the block. Decide with the concept |
 | D5 | Does act-on-a-machine stay? | `engine/machine/run.py` after cut C, `worker_client/executor.py` + `builtins.py` | **Keep**, built-ins only, no library, no Custom Actions (reasons in cut C) |
 | D6 | Resource tiers | `resource/resource.py` mixes Falcon's tier folders (`admin` / `restricted` / `workers` / `common`, `resource.shelves`, `resource.tag`) with what Restricted needs (a marked copy found where it may not be, allowances). `file_index.py:40` imports `allowed_tags_for` | **Not a cut: a reshape**, in START-HERE step 7, when marks and cases become one |
@@ -369,7 +371,7 @@ a flow or an action.
 START-HERE's steps 1 to 5, with what changed on 16 Nov 2026:
 
 1. The name is **Raven**. The repository and its folder are the user's to create or approve (creating one publishes something: ask).
-   The folder is outside Falcon's, not beside it and not inside it.
+   The folder is `Raven`, in the same parent folder as `Falcon` (the user, 16 Nov 2026), never inside it.
 2. Clone with history, repoint `origin`, push `main`.
 3. Replace `CLAUDE.md` with `docs/next-product/CLAUDE.md`, remove `PARKED.md`, commit.
 4. Save `docs/next-product/MEMORY-CARRYOVER.md` as the new folder's memory.

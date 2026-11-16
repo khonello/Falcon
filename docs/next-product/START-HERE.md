@@ -53,8 +53,8 @@ fingerprints, the snapshot's BitLocker, printers, USB devices and healing: desig
 
 ## Forking: the steps (each needs the user's yes where it creates or publishes something)
 
-1. **The user names the codename and the repository** (a new private GitHub repository under `khonello`, in its own folder outside
-   Falcon's: not beside it, not inside it). Creating the repository publishes something: ask first.
+1. **The user names the codename and the repository** (a new private GitHub repository under `khonello`, in its own folder `Raven`, in the
+   same parent folder as `Falcon`, never inside it: the user, 16 Nov 2026). Creating the repository publishes something: ask first.
 2. **Clone Falcon with its history** into that folder (`git clone https://github.com/khonello/Falcon <folder>`), point `origin` at the new
    repository (`git remote set-url origin <new>`), and push `main`. Falcon's own repository stays as it is, parked.
 3. **Replace `CLAUDE.md`** with `docs/next-product/CLAUDE.md` (it already says what this product is and the user's standing rules), and
