@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**The new product** (its name is not chosen yet: work under the codename the user gives; see `docs/next-product/START-HERE.md`), forked
+**Raven** (named by the user, 16 Nov 2026; see `docs/next-product/START-HERE.md`), forked
 from Falcon on 15 Nov 2026 with its full history. Falcon itself is parked in its own repository (github.com/khonello/Falcon, tag
 `falcon-parked-2026-11-15`). **Start every session at `docs/next-product/START-HERE.md`**: what the product is, what was decided, what is
-next. Then `docs/to-lookat.md`: raise its open items with the user.
+next. Then `docs/to-lookat.md`: raise its open items with the user. Taking Falcon's features out follows `docs/next-product/RAVEN-MAP.md`.
 
 One product for IT Admins: it watches what happens to a company's files on its Windows machines and puts it together as cases told in plain
 words, prioritising what the company marked as restricted. **One product, not features under an umbrella** (the user, 15 Nov 2026):

@@ -30,16 +30,13 @@ Decided by the user, 15 Nov 2026:
 - **Pricing:** yearly seat grants, Admin and Worker seats priced apart (suggested, not settled: Worker ~$40/yr, Admin ~$400/yr, one Admin
   seat included, 10-seat minimum); top-ups end on the main grant's date.
 
-## Its name: not chosen
+## Its name: Raven
 
-Being brainstormed with the user. Shortlist so far: **Raptor** (the user's favourite feel: "just sounds more yeaaaah"), with a twist to
-make it ownable (**RaptorSight**, Raptr, Raptor Watch: plain "Raptor" clashes with Raptor Technologies, school security software);
-**ProSight** (clashes with ProSight Specialty Insurance); Stillwatch, Keensight, Saker, Gyr, Heron. Not Detective (it reads as spying on
-staff, it is a common word, and it was one feature's name). Nothing has been checked for trademarks or domains yet.
+**Raven** (the user, 16 Nov 2026). Nothing has been checked for trademarks or domains yet: do that before anything ships.
 
-**Until it is chosen, work under a codename** (the user's to give; Raptor was suggested). Code packages are generic (`engine`,
-`worker_client`, `operator_client`, `common`), so nothing in the code waits for the name. **The visible brand is renamed once, in one pass,
-when the name is chosen and before anything ships:** `falcon-*-setup.exe`, the services (FalconEngine, FalconPostgres, FalconWorker), the
+Code packages are generic (`engine`,
+`worker_client`, `operator_client`, `common`), so the code does not wait for the rename. **The visible brand is renamed once, in one pass,
+after the cuts and before anything ships** (`RAVEN-MAP.md`, section 8)**:** `falcon-*-setup.exe`, the services (FalconEngine, FalconPostgres, FalconWorker), the
 folders (`C:\ProgramData\Falcon*`, `/opt/falcon`, `/var/lib/falcon*`, `/etc/falcon`), the `FALCON_*` settings, the certificate's organisation,
 the Linux users (`falcon`, `falcon-pg`), the docs and pages. After a customer has installed it, renaming means migrating real machines.
 
@@ -67,10 +64,10 @@ fingerprints, the snapshot's BitLocker, printers, USB devices and healing: desig
 5. **The user makes the virtual environments** (`environ-engine`, `environ-operator`, `environ-worker`): never make them yourself.
    PostgreSQL 18 is installed locally; make the fork its own databases (not `falcon` or `falcon_test*`: Falcon's), names the user agrees.
 6. **Take out what is out of scope** (Task, Flow, Automation / Custom Actions, Assistance leftovers), in reviewed steps, the suite green
-   after each (`scripts/test_batches.py`). Falcon's QML stays until the new concept replaces it, then goes.
+   after each (`scripts/test_batches.py`): **follow `docs/next-product/RAVEN-MAP.md`**, which says what goes where, file by file, in order. Falcon's QML stays until the new concept replaces it, then goes.
 7. **Then the product itself:** reshape the Engine side as one product (cases first, marks as part of them), and in a separate UI session,
    the new concept design, then QML to it.
-8. **The brand rename**, once the name is chosen (above).
+8. **The brand rename** to Raven (above).
 
 ## Left open from Falcon, still true here
 

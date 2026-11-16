@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "1"
+  },
   "permissions": {
     "allow": [
       "PowerShell(Select-String *)",
@@ -7,7 +10,18 @@
       "PowerShell(Get-Item *)",
       "PowerShell(Get-CimInstance *)",
       "PowerShell(Test-Path *)",
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git ls-files *)",
+      "Bash(git grep *)",
+      "Bash(environ-engine/Scripts/python.exe *)",
+      "Bash(environ-operator/Scripts/python.exe *)",
+      "Bash(environ-worker/Scripts/python.exe *)",
+      "Bash(environ-engine/Scripts/ruff.exe *)",
+      "Bash(environ-engine/Scripts/pytest.exe *)"
     ]
   }
 }
